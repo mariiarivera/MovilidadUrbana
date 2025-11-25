@@ -17,10 +17,12 @@ import { Scene3D } from '../libs/scene3d';
 import { Object3D } from '../libs/object3d';
 import { Camera3D } from '../libs/camera3d';
 
+
 // Functions and arrays for the communication with the API
 import {
   agents, obstacles, initAgentsModel,
-  update, getAgents, getObstacles
+  update, getAgents, getObstacles, trafficLights, road, destination,
+  getTrafficLights, getRoad, getDestination 
 } from '../libs/api_connection.js';
 
 // Define the shader code, using GLSL 3.00
@@ -67,7 +69,9 @@ async function main() {
   // Get the agents and obstacles
   await getAgents();
   await getObstacles();
-
+  await getTrafficLights();
+  await getRoad();
+  await getDestination();
 
   // Initialize the scene
   setupScene();
@@ -81,8 +85,6 @@ async function main() {
   // Fisrt call to the drawing loop
   drawScene();
 }
-
-
 
 function setupScene() {
   let camera = new Camera3D(0,
