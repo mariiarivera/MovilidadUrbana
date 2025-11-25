@@ -1,56 +1,64 @@
 from mesa import Model
-from mesa.time import RandomActivation
-from mesa.space import MultiGrid
-from trafficBase.agent import *
+from mesa.discrete_space import OrthogonalMooreGrid
+from .agent import *
 import json
 
-class CityModel(Model):
-    """ 
-        Creates a model based on a city map.
 
-        Args:
-            N: Number of agents in the simulation
+class CityModel(Model):
     """
-    def __init__(self, N):
+    Creates a model based on a city map.
+
+    Args:
+        N: Number of agents in the simulation
+        seed: Random seed for the model
+    """
+
+    def __init__(self, N, seed=42):
+
+        super().__init__(seed=seed)
 
         # Load the map dictionary. The dictionary maps the characters in the map file to the corresponding agent.
-        dataDictionary = json.load(open("static/city_files/mapDictionary.json"))
+        dataDictionary = json.load(open("city_files/mapDictionary.json"))
 
+        self.num_agents = N
         self.traffic_lights = []
 
         # Load the map file. The map file is a text file where each character represents an agent.
-        with open('static/city_files/2022_base.txt') as baseFile:
+        with open("city_files/2022_base.txt") as baseFile:
             lines = baseFile.readlines()
-            self.width = len(lines[0])-1
+            self.width = len(lines[0])
             self.height = len(lines)
 
-            self.grid = MultiGrid(self.width, self.height, torus = False) 
-            self.schedule = RandomActivation(self)
+            self.grid = OrthogonalMooreGrid(
+                [self.width, self.height], capacity=100, torus=False
+            )
 
             # Goes through each character in the map file and creates the corresponding agent.
             for r, row in enumerate(lines):
                 for c, col in enumerate(row):
+
+                    cell = self.grid[(c, self.height - r - 1)]
+
                     if col in ["v", "^", ">", "<"]:
-                        agent = Road(f"r_{r*self.width+c}", self, dataDictionary[col])
-                        self.grid.place_agent(agent, (c, self.height - r - 1))
+                        agent = Road(self, cell, dataDictionary[col])
 
                     elif col in ["S", "s"]:
-                        agent = Traffic_Light(f"tl_{r*self.width+c}", self, False if col == "S" else True, int(dataDictionary[col]))
-                        self.grid.place_agent(agent, (c, self.height - r - 1))
-                        self.schedule.add(agent)
+                        agent = Traffic_Light(
+                            self,
+                            cell,
+                            False if col == "S" else True,
+                            int(dataDictionary[col]),
+                        )
                         self.traffic_lights.append(agent)
 
                     elif col == "#":
-                        agent = Obstacle(f"ob_{r*self.width+c}", self)
-                        self.grid.place_agent(agent, (c, self.height - r - 1))
+                        agent = Obstacle(self, cell)
 
                     elif col == "D":
-                        agent = Destination(f"d_{r*self.width+c}", self)
-                        self.grid.place_agent(agent, (c, self.height - r - 1))
+                        agent = Destination(self, cell)
 
-        self.num_agents = N
         self.running = True
 
     def step(self):
-        '''Advance the model by one step.'''
-        self.schedule.step()
+        """Advance the model by one step."""
+        self.agents.shuffle_do("step")

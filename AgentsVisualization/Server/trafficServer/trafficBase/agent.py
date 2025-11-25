@@ -1,47 +1,40 @@
-from mesa import Agent
+from mesa.discrete_space import CellAgent, FixedAgent
 
-class Car(Agent):
+class Car(CellAgent):
     """
     Agent that moves randomly.
-    Attributes:
-        unique_id: Agent's ID 
-        direction: Randomly chosen direction chosen from one of eight directions
     """
-    def __init__(self, unique_id, model):
+    def __init__(self, model, cell):
         """
         Creates a new random agent.
         Args:
-            unique_id: The agent's ID
             model: Model reference for the agent
+            cell: The initial position of the agent
         """
-        super().__init__(unique_id, model)
-
-    def move(self):
-        """ 
-        Determines if the agent can move in the direction that was chosen
-        """        
-        self.model.grid.move_to_empty(self)
+        super().__init__(model)
+        self.cell = cell
 
     def step(self):
         """ 
         Determines the new direction it will take, and then moves
         """
-        self.move()
+        pass
 
-class Traffic_Light(Agent):
+class Traffic_Light(FixedAgent):
     """
     Traffic light. Where the traffic lights are in the grid.
     """
-    def __init__(self, unique_id, model, state = False, timeToChange = 10):
-        super().__init__(unique_id, model)
+    def __init__(self, model, cell, state = False, timeToChange = 10):
         """
         Creates a new Traffic light.
         Args:
-            unique_id: The agent's ID
             model: Model reference for the agent
+            cell: The initial position of the agent
             state: Whether the traffic light is green or red
             timeToChange: After how many step should the traffic light change color 
         """
+        super().__init__(model)
+        self.cell = cell
         self.state = state
         self.timeToChange = timeToChange
 
@@ -49,43 +42,49 @@ class Traffic_Light(Agent):
         """ 
         To change the state (green or red) of the traffic light in case you consider the time to change of each traffic light.
         """
-        if self.model.schedule.steps % self.timeToChange == 0:
+        if self.model.steps % self.timeToChange == 0:
             self.state = not self.state
 
-class Destination(Agent):
+class Destination(FixedAgent):
     """
     Destination agent. Where each car should go.
     """
-    def __init__(self, unique_id, model):
-        super().__init__(unique_id, model)
+    def __init__(self, model, cell):
+        """
+        Creates a new destination agent
+        Args:
+            model: Model reference for the agent
+            cell: The initial position of the agent
+        """
+        super().__init__(model)
+        self.cell = cell
 
-    def step(self):
-        pass
-
-class Obstacle(Agent):
+class Obstacle(FixedAgent):
     """
     Obstacle agent. Just to add obstacles to the grid.
     """
-    def __init__(self, unique_id, model):
-        super().__init__(unique_id, model)
+    def __init__(self, model, cell):
+        """
+        Creates a new obstacle.
+        
+        Args:
+            model: Model reference for the agent
+            cell: The initial position of the agent
+        """
+        super().__init__(model)
+        self.cell = cell
 
-    def step(self):
-        pass
-
-class Road(Agent):
+class Road(FixedAgent):
     """
     Road agent. Determines where the cars can move, and in which direction.
     """
-    def __init__(self, unique_id, model, direction= "Left"):
+    def __init__(self, model, cell, direction= "Left"):
         """
         Creates a new road.
         Args:
-            unique_id: The agent's ID
             model: Model reference for the agent
-            direction: Direction where the cars can move
+            cell: The initial position of the agent
         """
-        super().__init__(unique_id, model)
+        super().__init__(model)
+        self.cell = cell
         self.direction = direction
-
-    def step(self):
-        pass
