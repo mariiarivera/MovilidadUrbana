@@ -135,6 +135,36 @@ function setupObjects(scene, gl, programInfo) {
     scene.addObject(agent);
   }
 
+  // TRAFFIC LIGHTS
+for (const tl of trafficLights) {
+    tl.arrays = baseCube.arrays;
+    tl.bufferInfo = baseCube.bufferInfo;
+    tl.vao = baseCube.vao;
+    tl.scale = { x: 0.4, y: 1.0, z: 0.4 };
+    tl.color = [1.0, 1.0, 0.0, 1.0]; 
+    scene.addObject(tl);
+}
+
+// ROADS
+for (const rd of road) {
+    rd.arrays = baseCube.arrays;
+    rd.bufferInfo = baseCube.bufferInfo;
+    rd.vao = baseCube.vao;
+    rd.scale = { x: 1.0, y: 0.1, z: 1.0 };
+    rd.color = [0.2, 0.2, 0.2, 1.0];    
+    scene.addObject(rd);
+}
+
+// DESTINATIONS
+for (const dst of destination) {
+    dst.arrays = baseCube.arrays;
+    dst.bufferInfo = baseCube.bufferInfo;
+    dst.vao = baseCube.vao;
+    dst.scale = { x: 0.6, y: 0.6, z: 0.6 };
+    dst.color = [0.0, 1.0, 0.0, 1.0];  
+    scene.addObject(dst);
+}
+
 }
 
 // Draw an object with its corresponding transformations
