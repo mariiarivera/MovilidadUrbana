@@ -1,25 +1,5 @@
 from mesa.discrete_space import CellAgent, FixedAgent
 
-class Car(CellAgent):
-    """
-    Agent that moves randomly.
-    """
-    def __init__(self, model, cell):
-        """
-        Creates a new random agent.
-        Args:
-            model: Model reference for the agent
-            cell: The initial position of the agent
-        """
-        super().__init__(model)
-        self.cell = cell
-
-    def step(self):
-        """ 
-        Determines the new direction it will take, and then moves
-        """
-        pass
-
 class Traffic_Light(FixedAgent):
     """
     Traffic light. Where the traffic lights are in the grid.
@@ -88,3 +68,48 @@ class Road(FixedAgent):
         super().__init__(model)
         self.cell = cell
         self.direction = direction
+
+class Car(CellAgent):
+    """
+    Car agent that moves in the direction of the Road cell it's on.
+    """
+    def __init__(self, model):
+        super().__init__(model)
+
+    def step(self):
+
+        x, y = self.model.grid.get_position(self)
+
+        # asegurarse que este en road
+        cell = self.model.grid[x, y]
+        roads = [a for a in cell.agents if isinstance(a, Road)]
+        if not roads:
+            return
+
+        road = roads[0]
+        direction = road.direction
+
+        # mover segun la direccion 
+        dx, dy = 0, 0
+        if direction == "Up":
+            dy = 1
+        elif direction == "Down":
+            dy = -1
+        elif direction == "Left":
+            dx = -1
+        elif direction == "Right":
+            dx = 1
+
+        next_pos = (x + dx, y + dy)
+
+        # quedarse adentro
+        if not self.model.grid.in_bounds(next_pos):
+            return
+
+        # no pasar por obstaculos
+        next_cell = self.model.grid[next_pos]
+        if any(isinstance(a, Obstacle) for a in next_cell.agents):
+            return
+
+        # moverse 
+        self.model.grid.move_agent(self, next_pos)
