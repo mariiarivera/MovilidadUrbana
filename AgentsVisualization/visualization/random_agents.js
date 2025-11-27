@@ -1,13 +1,3 @@
-/*
- * Base program for a 3D scene that connects to an API to get the movement
- * of agents.
- * The scene shows colored cubes
- *
- * Gilberto Echeverria
- * 2025-11-08
- */
-
-
 'use strict';
 
 import * as twgl from 'twgl-base.js';
@@ -17,180 +7,146 @@ import { Scene3D } from '../libs/scene3d';
 import { Object3D } from '../libs/object3d';
 import { Camera3D } from '../libs/camera3d';
 
-
-// Functions and arrays for the communication with the API
+// API communication
 import {
   agents, obstacles, initAgentsModel,
   update, getAgents, getObstacles, trafficLights, road, destination,
   getTrafficLights, getRoad, getDestination 
 } from '../libs/api_connection.js';
 
-// Define the shader code, using GLSL 3.00
-import vsGLSL from '../assets/shaders/vs_color.glsl?raw';
-import fsGLSL from '../assets/shaders/fs_color.glsl?raw';
+// Shaders
+import vsColor from '../assets/shaders/vs_color.glsl?raw';
+import fsColor from '../assets/shaders/fs_color.glsl?raw';
+import vsPhong from '../assets/shaders/vs_phong.glsl?raw';
+import fsPhong from '../assets/shaders/fs_phong.glsl?raw';
+
+// OBJ models
+import building1OBJ from '../assets/models/building_1.obj?raw';
+import carOBJ from '../../objs/free_car_001.obj?raw';
 
 const scene = new Scene3D();
+let gl;
+let colorProgramInfo;
+let phongProgramInfo;
 
-/*
-// Variable for the scene settings
-const settings = {
-    // Speed in degrees
-    rotationSpeed: {
-        x: 0,
-        y: 0,
-        z: 0,
-    },
-};
-*/
-
-
-// Global variables
-let colorProgramInfo = undefined;
-let gl = undefined;
-const duration = 1000; // ms
+const duration = 1000;
 let elapsed = 0;
 let then = 0;
 
-
-// Main function is async to be able to make the requests
 async function main() {
-  // Setup the canvas area
   const canvas = document.querySelector('canvas');
   gl = canvas.getContext('webgl2');
   twgl.resizeCanvasToDisplaySize(gl.canvas);
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
-  // Prepare the program with the shaders
-  colorProgramInfo = twgl.createProgramInfo(gl, [vsGLSL, fsGLSL]);
+  // Compile both programs
+  colorProgramInfo = twgl.createProgramInfo(gl, [vsColor, fsColor]);
+  phongProgramInfo = twgl.createProgramInfo(gl, [vsPhong, fsPhong]);
 
-  // Initialize the agents model
   await initAgentsModel();
-
-  // Get the agents and obstacles
   await getAgents();
   await getObstacles();
   await getTrafficLights();
   await getRoad();
   await getDestination();
 
-  // Initialize the scene
   setupScene();
-
-  // Position the objects in the scene
-  setupObjects(scene, gl, colorProgramInfo);
-
-  // Prepare the user interface
+  setupObjects(scene, gl);
   setupUI();
-
-  // Fisrt call to the drawing loop
   drawScene();
 }
 
 function setupScene() {
-  let camera = new Camera3D(0,
-    10,             // Distance to target
-    4,              // Azimut
-    0.8,              // Elevation
-    [0, 0, 10],
-    [0, 0, 0]);
-  // These values are empyrical.
-  // Maybe find a better way to determine them
+  const camera = new Camera3D(0, 10, 4, 0.8, [0, 0, 10], [0, 0, 0]);
   camera.panOffset = [0, 8, 0];
   scene.setCamera(camera);
   scene.camera.setupControls();
 }
 
-function setupObjects(scene, gl, programInfo) {
-  // Create VAOs for the different shapes
+function setupObjects(scene, gl) {
+  // Base cube for obstacles, roads, destinations
   const baseCube = new Object3D(-1);
-  baseCube.prepareVAO(gl, programInfo);
+  baseCube.prepareVAO(gl, colorProgramInfo);
 
-  /*
-  // A scaled cube to use as the ground
-  const ground = new Object3D(-3, [14, 0, 14]);
-  ground.arrays = baseCube.arrays;
-  ground.bufferInfo = baseCube.bufferInfo;
-  ground.vao = baseCube.vao;
-  ground.scale = {x: 50, y: 0.1, z: 50};
-  ground.color = [0.6, 0.6, 0.6, 1];
-  scene.addObject(ground);
-  */
+  // Car OBJ model
+  const carModel = new Object3D(-2);
+  carModel.prepareVAO(gl, phongProgramInfo, carOBJ);
 
-  // Copy the properties of the base objects
+  // Building OBJ model (traffic lights)
+  const buildingModel = new Object3D(-3);
+  buildingModel.prepareVAO(gl, phongProgramInfo, building1OBJ);
+
+  // AGENTS → Car OBJ
   for (const agent of agents) {
-    agent.arrays = baseCube.arrays;
-    agent.bufferInfo = baseCube.bufferInfo;
-    agent.vao = baseCube.vao;
-    agent.scale = { x: 0.5, y: 0.5, z: 0.5 };
+    agent.arrays = carModel.arrays;
+    agent.bufferInfo = carModel.bufferInfo;
+    agent.vao = carModel.vao;
+    agent.scale = { x: 1.5, y: 1.5, z: 1.5 }; 
+    agent.posArray = agent.posArray || [0,0,0]; 
+    agent.rotRad = agent.rotRad || {x:0, y:0, z:0};
+
+    // Phong material
+    agent.ambientColor = [0.1, 0.1, 0.1, 1];
+    agent.diffuseColor = [0.8, 0.1, 0.1, 1];
+    agent.specularColor = [1, 1, 1, 1];
+    agent.shininess = 50;
+
     scene.addObject(agent);
   }
 
-  // Copy the properties of the base objects
-  for (const agent of obstacles) {
-    agent.arrays = baseCube.arrays;
-    agent.bufferInfo = baseCube.bufferInfo;
-    agent.vao = baseCube.vao;
-    agent.scale = { x: 0.5, y: 0.5, z: 0.5 };
-    agent.color = [0.7, 0.7, 0.7, 1.0];
-    scene.addObject(agent);
+  // OBSTACLES → Cubes
+  for (const ob of obstacles) {
+    ob.arrays = baseCube.arrays;
+    ob.bufferInfo = baseCube.bufferInfo;
+    ob.vao = baseCube.vao;
+    ob.scale = { x: 0.5, y: 0.5, z: 0.5 };
+    ob.color = [0.7, 0.7, 0.7, 1];
+    scene.addObject(ob);
   }
 
-  // TRAFFIC LIGHTS
-for (const tl of trafficLights) {
-    tl.arrays = baseCube.arrays;
-    tl.bufferInfo = baseCube.bufferInfo;
-    tl.vao = baseCube.vao;
-    tl.scale = { x: 0.4, y: 1.0, z: 0.4 };
-    tl.color = [1.0, 1.0, 0.0, 1.0]; 
+  // TRAFFIC LIGHTS → Building OBJ
+  for (const tl of trafficLights) {
+    tl.arrays = buildingModel.arrays;
+    tl.bufferInfo = buildingModel.bufferInfo;
+    tl.vao = buildingModel.vao;
+    tl.scale = { x: 1, y: 1.5, z: 1.5 };
+
+    tl.ambientColor = [0.1, 0.1, 0.1, 1];
+    tl.diffuseColor = [1, 1, 0, 1];
+    tl.specularColor = [1, 1, 1, 1];
+    tl.shininess = 30;
+
     scene.addObject(tl);
-}
+  }
 
-// ROADS
-for (const rd of road) {
+  // ROADS → Cubes
+  for (const rd of road) {
     rd.arrays = baseCube.arrays;
     rd.bufferInfo = baseCube.bufferInfo;
     rd.vao = baseCube.vao;
     rd.scale = { x: 1.0, y: 0.1, z: 1.0 };
-    rd.color = [0.2, 0.2, 0.2, 1.0];    
+    rd.color = [0.2, 0.2, 0.2, 1];
     scene.addObject(rd);
-}
+  }
 
-// DESTINATIONS
-for (const dst of destination) {
+  // DESTINATIONS → Cubes
+  for (const dst of destination) {
     dst.arrays = baseCube.arrays;
     dst.bufferInfo = baseCube.bufferInfo;
     dst.vao = baseCube.vao;
     dst.scale = { x: 0.6, y: 0.6, z: 0.6 };
-    dst.color = [0.0, 1.0, 0.0, 1.0];  
+    dst.color = [0, 1, 0, 1];
     scene.addObject(dst);
+  }
 }
 
-}
+function drawObject(gl, programInfo, object, viewProjectionMatrix) {
+  const scaMat = M4.scale(object.scaArray || object.scale || {x:1,y:1,z:1});
+  const rotXMat = M4.rotationX(object.rotRad?.x || 0);
+  const rotYMat = M4.rotationY(object.rotRad?.y || 0);
+  const rotZMat = M4.rotationZ(object.rotRad?.z || 0);
+  const traMat = M4.translation(object.posArray || [0,0,0]);
 
-// Draw an object with its corresponding transformations
-function drawObject(gl, programInfo, object, viewProjectionMatrix, fract) {
-  // Prepare the vector for translation and scale
-  let v3_tra = object.posArray;
-  let v3_sca = object.scaArray;
-
-  /*
-  // Animate the rotation of the objects
-  object.rotDeg.x = (object.rotDeg.x + settings.rotationSpeed.x * fract) % 360;
-  object.rotDeg.y = (object.rotDeg.y + settings.rotationSpeed.y * fract) % 360;
-  object.rotDeg.z = (object.rotDeg.z + settings.rotationSpeed.z * fract) % 360;
-  object.rotRad.x = object.rotDeg.x * Math.PI / 180;
-  object.rotRad.y = object.rotDeg.y * Math.PI / 180;
-  object.rotRad.z = object.rotDeg.z * Math.PI / 180;
-  */
-
-  // Create the individual transform matrices
-  const scaMat = M4.scale(v3_sca);
-  const rotXMat = M4.rotationX(object.rotRad.x);
-  const rotYMat = M4.rotationY(object.rotRad.y);
-  const rotZMat = M4.rotationZ(object.rotRad.z);
-  const traMat = M4.translation(v3_tra);
-
-  // Create the composite matrix with all transformations
   let transforms = M4.identity();
   transforms = M4.multiply(scaMat, transforms);
   transforms = M4.multiply(rotXMat, transforms);
@@ -199,49 +155,58 @@ function drawObject(gl, programInfo, object, viewProjectionMatrix, fract) {
   transforms = M4.multiply(traMat, transforms);
 
   object.matrix = transforms;
-
-  // Apply the projection to the final matrix for the
-  // World-View-Projection
   const wvpMat = M4.multiply(viewProjectionMatrix, transforms);
 
-  // Model uniforms
-  let objectUniforms = {
-    u_transforms: wvpMat
-  }
-  twgl.setUniforms(programInfo, objectUniforms);
+  const usePhong = object.ambientColor !== undefined;
+  const program = usePhong ? phongProgramInfo : colorProgramInfo;
 
+  gl.useProgram(program.program);
   gl.bindVertexArray(object.vao);
-  twgl.drawBufferInfo(gl, object.bufferInfo);
+
+  if (usePhong) {
+    twgl.setUniforms(program, {
+      u_lightWorldPosition: [10, 20, 10],
+      u_viewWorldPosition: scene.camera.posArray,
+      u_ambientLight: [0.2, 0.2, 0.2, 1],
+      u_diffuseLight: [1, 1, 1, 1],
+      u_specularLight: [1, 1, 1, 1],
+      u_ambientColor: object.ambientColor,
+      u_diffuseColor: object.diffuseColor,
+      u_specularColor: object.specularColor,
+      u_shininess: object.shininess,
+      u_world: object.matrix,
+      u_worldInverseTransform: M4.inverse(object.matrix),
+      u_worldViewProjection: wvpMat
+    });
+  } else {
+    twgl.setUniforms(program, { u_transforms: wvpMat, u_color: object.color });
+  }
+
+twgl.drawBufferInfo(gl, object.bufferInfo);
+
 }
 
-// Function to do the actual display of the objects
+
 async function drawScene() {
-  // Compute time elapsed since last frame
-  let now = Date.now();
-  let deltaTime = now - then;
+  const now = Date.now();
+  const deltaTime = now - then;
   elapsed += deltaTime;
-  let fract = Math.min(1.0, elapsed / duration);
+  const fract = Math.min(1.0, elapsed / duration);
   then = now;
 
-  // Clear the canvas
   gl.clearColor(0, 0, 0, 1);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-  // tell webgl to cull faces
   gl.enable(gl.CULL_FACE);
   gl.enable(gl.DEPTH_TEST);
 
   scene.camera.checkKeys();
-  //console.log(scene.camera);
   const viewProjectionMatrix = setupViewProjection(gl);
 
-  // Draw the objects
-  gl.useProgram(colorProgramInfo.program);
-  for (let object of scene.objects) {
-    drawObject(gl, colorProgramInfo, object, viewProjectionMatrix, fract);
+  for (const object of scene.objects) {
+    drawObject(gl, object.ambientColor ? phongProgramInfo : colorProgramInfo,
+               object, viewProjectionMatrix, fract);
   }
 
-  // Update the scene after the elapsed duration
   if (elapsed >= duration) {
     elapsed = 0;
     await update();
@@ -251,38 +216,18 @@ async function drawScene() {
 }
 
 function setupViewProjection(gl) {
-  // Field of view of 60 degrees vertically, in radians
   const fov = 60 * Math.PI / 180;
   const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
-
-  // Matrices for the world view
   const projectionMatrix = M4.perspective(fov, aspect, 1, 200);
 
-  const cameraPosition = scene.camera.posArray;
-  const target = scene.camera.targetArray;
-  const up = [0, 1, 0];
-
-  const cameraMatrix = M4.lookAt(cameraPosition, target, up);
+  const cameraMatrix = M4.lookAt(scene.camera.posArray, scene.camera.targetArray, [0, 1, 0]);
   const viewMatrix = M4.inverse(cameraMatrix);
-  const viewProjectionMatrix = M4.multiply(projectionMatrix, viewMatrix);
 
-  return viewProjectionMatrix;
+  return M4.multiply(projectionMatrix, viewMatrix);
 }
 
-// Setup a ui.
 function setupUI() {
-  /*
-  const gui = new GUI();
-
-  // Settings for the animation
-  const animFolder = gui.addFolder('Animation:');
-  animFolder.add( settings.rotationSpeed, 'x', 0, 360)
-      .decimals(2)
-  animFolder.add( settings.rotationSpeed, 'y', 0, 360)
-      .decimals(2)
-  animFolder.add( settings.rotationSpeed, 'z', 0, 360)
-      .decimals(2)
-  */
+  // GUI can be added here if needed
 }
 
 main();
