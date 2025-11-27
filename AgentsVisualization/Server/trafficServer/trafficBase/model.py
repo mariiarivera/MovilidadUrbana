@@ -22,6 +22,7 @@ class CityModel(Model):
 
         self.num_agents = N
         self.traffic_lights = []
+        self.buildings = []
 
         # Load the map file. The map file is a text file where each character represents an agent.
         with open("city_files/2022_base.txt") as baseFile:

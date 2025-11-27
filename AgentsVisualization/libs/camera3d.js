@@ -42,8 +42,8 @@ class Camera3D {
         this.maxElevation = Math.PI / 2 - 0.1;  // Aproximately  90 - 5.7 degrees
 
         // Transformation speeds
-        this.rotationSpeed = 0.02;
-        this.panSpeed = 0.5;
+        this.rotationSpeed = 0.08;
+        this.panSpeed = 1.5;
         this.zoomSpeed = 2.0;
 
         // Panning variables
