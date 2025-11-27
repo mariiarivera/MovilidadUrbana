@@ -21,7 +21,8 @@ import vsPhong from '../assets/shaders/vs_phong.glsl?raw';
 import fsPhong from '../assets/shaders/fs_phong.glsl?raw';
 
 // OBJ models
-import building1OBJ from '../assets/models/building_1.obj?raw';
+import trafficLightOBJ from '../assets/models/trafficlight.obj?raw';
+import roadOBJ from '../assets/models/road.obj?raw';
 import carOBJ from '../../objs/free_car_001.obj?raw';
 
 const scene = new Scene3D();
@@ -39,7 +40,6 @@ async function main() {
   twgl.resizeCanvasToDisplaySize(gl.canvas);
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
-  // Compile both programs
   colorProgramInfo = twgl.createProgramInfo(gl, [vsColor, fsColor]);
   phongProgramInfo = twgl.createProgramInfo(gl, [vsPhong, fsPhong]);
 
@@ -73,8 +73,11 @@ function setupObjects(scene, gl) {
   carModel.prepareVAO(gl, phongProgramInfo, carOBJ);
 
   // Building OBJ model (traffic lights)
-  const buildingModel = new Object3D(-3);
-  buildingModel.prepareVAO(gl, phongProgramInfo, building1OBJ);
+  const trafficLightModel = new Object3D(-3);
+  trafficLightModel.prepareVAO(gl, phongProgramInfo, trafficLightOBJ);
+
+  const roadModel = new Object3D(-4);
+  roadModel.prepareVAO(gl, phongProgramInfo, roadOBJ);
 
   // AGENTS → Car OBJ
   for (const agent of agents) {
@@ -106,10 +109,10 @@ function setupObjects(scene, gl) {
 
   // TRAFFIC LIGHTS → Building OBJ
   for (const tl of trafficLights) {
-    tl.arrays = buildingModel.arrays;
-    tl.bufferInfo = buildingModel.bufferInfo;
-    tl.vao = buildingModel.vao;
-    tl.scale = { x: 1, y: 1.5, z: 1.5 };
+    tl.arrays = trafficLightModel.arrays;
+    tl.bufferInfo = trafficLightModel.bufferInfo;
+    tl.vao = trafficLightModel.vao;
+    tl.scale = { x: 0.2, y: 0.09, z: 0.2 };
 
     tl.ambientColor = [0.1, 0.1, 0.1, 1];
     tl.diffuseColor = [1, 1, 0, 1];
@@ -119,13 +122,18 @@ function setupObjects(scene, gl) {
     scene.addObject(tl);
   }
 
-  // ROADS → Cubes
+  // ROADS → road OBJ
   for (const rd of road) {
-    rd.arrays = baseCube.arrays;
-    rd.bufferInfo = baseCube.bufferInfo;
-    rd.vao = baseCube.vao;
+    rd.arrays = roadModel.arrays;
+    rd.bufferInfo = roadModel.bufferInfo;
+    rd.vao = roadModel.vao;
     rd.scale = { x: 1.0, y: 0.1, z: 1.0 };
-    rd.color = [0.2, 0.2, 0.2, 1];
+    rd.ambientColor = [0.1, 0.1, 0.1, 1];
+    rd.diffuseColor = [1, 1, 0, 1];
+    rd.specularColor = [1, 1, 1, 1];
+    rd.shininess = 30;
+
+
     scene.addObject(rd);
   }
 

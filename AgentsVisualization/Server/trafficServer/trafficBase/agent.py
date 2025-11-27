@@ -1,6 +1,6 @@
 from mesa.discrete_space import CellAgent, FixedAgent
 
-class Car(CellAgent):
+class Agent(CellAgent):
     """
     Agent that moves randomly.
     """

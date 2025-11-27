@@ -5,7 +5,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
 from trafficBase.model import CityModel
-from trafficBase.agent import Car, Traffic_Light, Destination, Obstacle, Road
+from trafficBase.agent import Agent, Traffic_Light, Destination, Obstacle, Road
 
 # Simulation parameters
 number_agents = 10
@@ -50,14 +50,14 @@ def getAgents():
     global cityModel
     try:
         agentCells = cityModel.grid.all_cells.select(
-            lambda cell: any(isinstance(obj, Car) for obj in cell.agents)
+            lambda cell: any(isinstance(obj, Agent) for obj in cell.agents)
         ).cells
 
         agents = [
             (cell.coordinate, agent)
             for cell in agentCells
             for agent in cell.agents
-            if isinstance(agent, Car)
+            if isinstance(agent, Agent)
         ]
 
         positions = [
