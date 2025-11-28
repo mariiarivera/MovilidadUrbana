@@ -218,6 +218,7 @@ async function drawScene() {
   if (elapsed >= duration) {
     elapsed = 0;
     await update();
+    updateSceneObj();
   }
 
   requestAnimationFrame(drawScene);

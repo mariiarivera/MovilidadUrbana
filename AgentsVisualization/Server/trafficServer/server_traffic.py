@@ -60,6 +60,8 @@ def getAgents():
             if isinstance(agent, Agent)
         ]
 
+        # print(agentCells)
+
         positions = [
             {"id": str(a.unique_id), "x": c[0], "y": 1, "z": c[1]}
             for (c, a) in agents
