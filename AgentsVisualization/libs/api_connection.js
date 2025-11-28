@@ -45,6 +45,7 @@ async function getAgents() {
             let result = await response.json();
 
             if (agents.length === 0) {
+                console.log("carros creados", agents, result);
                 for (const agent of result.positions) {
                     const newAgent = new Object3D(agent.id, [agent.x, agent.y, agent.z]);
                     newAgent.oldPosArray = newAgent.posArray;
@@ -137,10 +138,10 @@ async function update() {
 
         if (response.ok) {
             await getAgents();
-            await getObstacles();
+            //await getObstacles();
             await getTrafficLights();
-            await getRoad();
-            await getDestination();
+            //await getRoad();
+            //await getDestination();
         }
 
     } catch (error) {

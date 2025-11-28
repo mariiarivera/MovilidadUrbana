@@ -73,23 +73,22 @@ class Car(CellAgent):
     """
     Car agent that moves in the direction of the Road cell it's on.
     """
-    def __init__(self, model):
+    def __init__(self, model, cell):
         super().__init__(model)
+        self.cell = cell
 
-    def step(self):
+    def move(self):
+        x, y = self.cell.coordinate
+        current_cell = self.model.grid[x, y]
+    
+        #saber donde esta la road 
+        road = next((agent for agent in current_cell.agents if isinstance(agent, Road)), None)
 
-        x, y = self.model.grid.get_position(self)
-
-        # asegurarse que este en road
-        cell = self.model.grid[x, y]
-        roads = [a for a in cell.agents if isinstance(a, Road)]
-        if not roads:
-            return
-
-        road = roads[0]
-        direction = road.direction
-
+        if road is None:
+            return 
         # mover segun la direccion 
+
+        direction = road.direction
         dx, dy = 0, 0
         if direction == "Up":
             dy = 1
@@ -102,14 +101,16 @@ class Car(CellAgent):
 
         next_pos = (x + dx, y + dy)
 
-        # quedarse adentro
-        if not self.model.grid.in_bounds(next_pos):
-            return
-
         # no pasar por obstaculos
         next_cell = self.model.grid[next_pos]
         if any(isinstance(a, Obstacle) for a in next_cell.agents):
             return
 
         # moverse 
-        self.model.grid.move_agent(self, next_pos)
+        next_cell = self.model.grid[next_pos]
+        self.cell = next_cell
+        print(f"Car {self.unique_id} moved to {next_pos}")
+
+    def step(self):
+
+        self.move()

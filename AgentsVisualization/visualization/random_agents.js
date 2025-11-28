@@ -166,6 +166,65 @@ for (const dst of destination) {
 }
 
 }
+function updateSceneObj() {
+  // Create sets of IDs for each category
+  const currentAgentsIDs = new Set(agents.map(agent => agent.id));
+  const obstacleIDs = new Set(obstacles.map(obstacle => obstacle.id));
+  const trafficLightsIDs = new Set(trafficLights.map(tl => tl.id));
+  const roadIDs = new Set(road.map(r => r.id));
+  const destinationIDs = new Set(destination.map(d => d.id)); // Make sure destination has IDs too
+
+  // Filter out objects that are not agents, obstacles, or traffic lights
+  scene.objects = scene.objects.filter(obj => {
+    // Only keep objects that match IDs in our sets
+    return obstacleIDs.has(obj.id) || trafficLightsIDs.has(obj.id) || roadIDs.has(obj.id) || destinationIDs.has(obj.id) || currentAgentsIDs.has(obj.id);
+  });
+
+  // Loop through all agents and add or update them in the scene
+  for (const agent of agents) {
+    // Check if the agent already exists in the scene
+    const existingObj = scene.objects.find(obj => obj.id === agent.id);
+
+    if (existingObj) {
+      // Update the existing object's position
+      existingObj.posArray = agent.posArray;
+    } else {
+      // If it's a new agent, create a new object and add it to the scene
+      agent.posArray = agent.position ? [agent.position.x, agent.position.y, agent.position.z] : [0, 0, 0];
+      scene.addObject(agent);
+    }
+  }
+
+  // Same for other objects like obstacles, traffic lights, and road, if needed
+  for (const obstacle of obstacles) {
+    const existingObj = scene.objects.find(obj => obj.id === obstacle.id);
+    if (!existingObj) {
+      scene.addObject(obstacle);
+    }
+  }
+
+  for (const trafficLight of trafficLights) {
+    const existingObj = scene.objects.find(obj => obj.id === trafficLight.id);
+    if (!existingObj) {
+      scene.addObject(trafficLight);
+    }
+  }
+
+  // If necessary, update positions or add new objects for road and destination
+  for (const rd of road) {
+    const existingObj = scene.objects.find(obj => obj.id === rd.id);
+    if (!existingObj) {
+      scene.addObject(rd);
+    }
+  }
+
+  for (const dst of destination) {
+    const existingObj = scene.objects.find(obj => obj.id === dst.id);
+    if (!existingObj) {
+      scene.addObject(dst);
+    }
+  }
+}
 
 // Draw an object with its corresponding transformations
 function drawObject(gl, programInfo, object, viewProjectionMatrix, fract) {
@@ -245,6 +304,7 @@ async function drawScene() {
   if (elapsed >= duration) {
     elapsed = 0;
     await update();
+    updateSceneObj();
   }
 
   requestAnimationFrame(drawScene);
