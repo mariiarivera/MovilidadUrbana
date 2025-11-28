@@ -1,5 +1,25 @@
 from mesa.discrete_space import CellAgent, FixedAgent
 
+class Agent(CellAgent):
+    """
+    Agent that moves randomly.
+    """
+    def __init__(self, model, cell):
+        """
+        Creates a new random agent.
+        Args:
+            model: Model reference for the agent
+            cell: The initial position of the agent
+        """
+        super().__init__(model)
+        self.cell = cell
+
+    def step(self):
+        """ 
+        Determines the new direction it will take, and then moves
+        """
+        pass
+
 class Traffic_Light(FixedAgent):
     """
     Traffic light. Where the traffic lights are in the grid.

@@ -25,9 +25,6 @@ class CityModel(Model):
         self.cars = []
         self.traffic_lights = []
         self.buildings = []
-        self.spawnSteps = 5  # Steps between spawning new cars
-
-        self.grid = None
 
         # Load the map file. The map file is a text file where each character represents an agent.
         with open("city_files/2022_base.txt") as baseFile:
