@@ -1,0 +1,30 @@
+newmtl Blue_glass
+Ka 0 0 0
+Ns 34.4669
+Ks 1 1 1
+Kd 0.435294 0.917647 1
+newmtl Flat_gray
+Ka 0 0 0
+Ns 8.16617
+Ks 1 1 1
+Kd 0.501961 0.501961 0.501961
+newmtl Blurred_glass
+Ka 0 0 0
+Ns 34.4669
+Ks 1 1 1
+Kd 1 1 1
+newmtl Aluminium
+Ka 0 0 0
+Ns 1.82212
+Ks 1 1 1
+Kd 0.647059 0.647059 0.647059
+newmtl Brushed_silver
+Ka 0 0 0
+Ns 3.32012
+Ks 1 0.788235 0.635294
+Kd 0.749005 0.749005 0.749005
+newmtl Gray_Clumps
+Ka 0 0 0
+Ns 8.16617
+Ks 1 1 1
+Kd 0.713204 0.721849 0.682826
