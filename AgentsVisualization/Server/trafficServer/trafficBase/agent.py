@@ -93,9 +93,13 @@ class Car(CellAgent):
     """
     Car agent that moves in the direction of the Road cell it's on.
     """
-    def __init__(self, model, cell):
+    def __init__(self, model, cell, unique_id=None,dest=None):
         super().__init__(model)
         self.cell = cell
+
+        self.unique_id = unique_id
+        
+        self.dest = dest
 
     def move(self):
         x, y = self.cell.coordinate
