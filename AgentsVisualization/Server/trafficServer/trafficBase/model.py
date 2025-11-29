@@ -4,7 +4,6 @@ from .agent import *
 import json
 import random
 
-
 class CityModel(Model):
     """
     Creates a model based on a city map.
@@ -18,13 +17,25 @@ class CityModel(Model):
 
         super().__init__(seed=seed)
 
+        # Crea un generador de números aleatorios explícitamente
+        self.random_gen = random.Random(seed)  # Usamos el `seed` para la reproducibilidad
+
         # Load the map dictionary. The dictionary maps the characters in the map file to the corresponding agent.
         dataDictionary = json.load(open("city_files/mapDictionary.json"))
 
         self.num_agents = N
-        self.cars = []
         self.traffic_lights = []
-        self.buildings = []
+        self.destinations = []
+        self.spawnSteps = 10  # default spawn steps, can be customized
+
+        # SuperMetricas (metrics to track simulation progress)
+        self.carCounter = 0
+        self.totCarsSpawned = 0
+        self.totCarsArrived = 0
+        self.totStepsTaken = 0
+        self.totSemaforosFound = 0
+        self.carsEnTrafico = 0
+        self.embotellamientos = 0
 
         # Load the map file. The map file is a text file where each character represents an agent.
         with open("city_files/2022_base.txt") as baseFile:
@@ -32,8 +43,9 @@ class CityModel(Model):
             self.width = len(lines[0])
             self.height = len(lines)
 
+            # Crear la cuadrícula de la simulación, pasando `self.random_gen` como generador de números aleatorios
             self.grid = OrthogonalMooreGrid(
-                [self.width, self.height], capacity=100, torus=False
+                [self.width, self.height], capacity=100, torus=False, random=self.random_gen
             )
 
             # Goes through each character in the map file and creates the corresponding agent.
@@ -59,14 +71,13 @@ class CityModel(Model):
 
                     elif col == "D":
                         agent = Destination(self, cell)
+                        self.destinations.append(agent)
 
-                    
         self.running = True
 
     def spawnCars(self): 
         """Spawn a new car at a random corner of the map with a random destination"""
         corner_size = 1 
-        
         corners = [
             # Top-left 
             [(x, y) for x in range(corner_size) for y in range(self.height - corner_size, self.height)],
@@ -77,13 +88,10 @@ class CityModel(Model):
             # Bottom-right
             [(x, y) for x in range(self.width - corner_size, self.width) for y in range(corner_size)]
         ]
-        
-        corner_index = self.random.randint(0, 3)
+
+        corner_index = self.random_gen.randint(0, 3)
         corner_coords = corners[corner_index]
-        #corner_names = ["Top-Left", "Top-Right", "Bottom-Left", "Bottom-Right"]
-        
-        #print(f"Attempting to spawn car in {corner_names[corner_index]} corner")
-        
+
         empty_roads = []
         for coord in corner_coords:
             try:
@@ -95,29 +103,24 @@ class CityModel(Model):
                 if has_road and not has_car:
                     empty_roads.append(cell)
             except Exception as e:
-               # print(f"Error checking cell {coord}: {e}")
                 continue
-        
-        if empty_roads:
-            
-            
-            car = Car(self, self.random.choice(empty_roads))
-            #print(f"Car {car.unique_id} spawned at {corner_names[corner_index]} corner position: {spawn_cell.coordinate}")
-            #print(f"Car {car.unique_id} assigned destination: {destination_cell.coordinate}")
-        #else:
-         #   if not self.destinations:
-               # print(f"No destinations available in the map!")
-          #  else:
-                #print(f"No available spawn points in {corner_names[corner_index]} corner")
+
+        if empty_roads and self.destinations:
+            spawn_cell = self.random_gen.choice(empty_roads)
+            random_destination_agent = self.random_gen.choice(self.destinations)
+            destination_cell = random_destination_agent.cell  
+
+            car = Car(self, spawn_cell, self.carCounter, dest=destination_cell)
+            self.carCounter += 1
+            self.totCarsSpawned += 1
 
     def step(self):
         """Advance the model by one step."""
         if self.steps == 0 or self.steps == 1: 
-            self.spawnCars() # porque por alguna razón no pone nada en step 0
+            self.spawnCars()  # because for some reason it doesn't spawn at step 0
         if self.steps % self.spawnSteps == 0:
             self.spawnCars()
-       # print(f"\n--- Step {self.steps} - Total agents: {len(self.agents)} ---")
+
         cars = [a for a in self.agents if isinstance(a, Car)]
-        #print(f"Active cars: {len(cars)}")
         
         self.agents.shuffle_do("step")
