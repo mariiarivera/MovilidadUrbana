@@ -9,9 +9,8 @@ import { Camera3D } from '../libs/camera3d';
 
 // API communication
 import {
-  agents, obstacles, initAgentsModel,
-  update, getAgents, getObstacles, trafficLights, road, destination,
-  getTrafficLights, getRoad, getDestination 
+  agents, obstacles, trafficLights, road, destination, initAgentsModel,
+  update, getAgents, getTrafficLights, getDestination, getRoad, getObstacles
 } from '../libs/api_connection.js';
 
 // Shaders
@@ -44,11 +43,11 @@ async function main() {
   phongProgramInfo = twgl.createProgramInfo(gl, [vsPhong, fsPhong]);
 
   await initAgentsModel();
-  await getAgents();
-  await getObstacles();
-  await getTrafficLights();
-  await getRoad();
-  await getDestination();
+  await getAgents();  // Fetch agents
+  await getObstacles();  // Fetch obstacles
+  await getTrafficLights();  // Fetch traffic lights
+  await getRoad();  // Fetch roads
+  await getDestination();  // Fetch destination
 
   setupScene();
   setupObjects(scene, gl);
@@ -76,10 +75,11 @@ function setupObjects(scene, gl) {
   const trafficLightModel = new Object3D(-3);
   trafficLightModel.prepareVAO(gl, phongProgramInfo, trafficLightOBJ);
 
+  // Road OBJ model
   const roadModel = new Object3D(-4);
   roadModel.prepareVAO(gl, phongProgramInfo, roadOBJ);
 
-  // AGENTS → Car OBJ
+  // Setup agents (cars)
   for (const agent of agents) {
     agent.arrays = carModel.arrays;
     agent.bufferInfo = carModel.bufferInfo;
@@ -88,7 +88,7 @@ function setupObjects(scene, gl) {
     agent.posArray = agent.posArray || [0,0,0]; 
     agent.rotRad = agent.rotRad || {x:0, y:0, z:0};
 
-    // Phong material
+    // Phong material for the cars
     agent.ambientColor = [0.1, 0.1, 0.1, 1];
     agent.diffuseColor = [0.8, 0.1, 0.1, 1];
     agent.specularColor = [1, 1, 1, 1];
@@ -97,7 +97,7 @@ function setupObjects(scene, gl) {
     scene.addObject(agent);
   }
 
-  // OBSTACLES → Cubes
+  // Setup obstacles (buildings)
   for (const ob of obstacles) {
     ob.arrays = baseCube.arrays;
     ob.bufferInfo = baseCube.bufferInfo;
@@ -107,7 +107,7 @@ function setupObjects(scene, gl) {
     scene.addObject(ob);
   }
 
-  // TRAFFIC LIGHTS → Building OBJ
+  // Setup traffic lights (buildings)
   for (const tl of trafficLights) {
     tl.arrays = trafficLightModel.arrays;
     tl.bufferInfo = trafficLightModel.bufferInfo;
@@ -122,7 +122,7 @@ function setupObjects(scene, gl) {
     scene.addObject(tl);
   }
 
-  // ROADS → road OBJ
+  // Setup roads
   for (const rd of road) {
     rd.arrays = roadModel.arrays;
     rd.bufferInfo = roadModel.bufferInfo;
@@ -133,11 +133,10 @@ function setupObjects(scene, gl) {
     rd.specularColor = [1, 1, 1, 1];
     rd.shininess = 30;
 
-
     scene.addObject(rd);
   }
 
-  // DESTINATIONS → Cubes
+  // Setup destination
   for (const dst of destination) {
     dst.arrays = baseCube.arrays;
     dst.bufferInfo = baseCube.bufferInfo;
@@ -148,12 +147,56 @@ function setupObjects(scene, gl) {
   }
 }
 
+// Optimized function to update scene objects after fetching new positions
+function updateSceneObjects() {
+  const currentAgentIds = new Set(agents.map(agent => agent.id));
+  const obstacleIds = new Set(obstacles.map(obs => obs.id));
+  const trafficLightIds = new Set(trafficLights.map(light => light.id));
+  const roadIds = new Set(road.map(r => r.id));
+
+  scene.objects = scene.objects.filter(obj => {
+    if (obstacleIds.has(obj.id)) return true;
+    if (trafficLightIds.has(obj.id)) return true;
+    if (roadIds.has(obj.id)) return true;
+    if (obj.id < 0) return true;
+    return currentAgentIds.has(obj.id);
+  });
+
+  // Update the positions and rotations of the cars (agents)
+  for (const agent of agents) {
+    const existingObj = scene.objects.find(obj => obj.id === agent.id);
+
+    if (existingObj) {
+      existingObj.oldPosArray = [...existingObj.posArray];
+      existingObj.position = agent.position;
+      existingObj.oldRotation = { ...existingObj.rotation };
+      existingObj.rotation = {
+        x: 0,
+        y: directionToAngle(agent.dirActual || "Right"),
+        z: 0
+      };
+    } else {
+      agent.arrays = scene.baseCar.arrays;
+      agent.bufferInfo = scene.baseCar.bufferInfo;
+      agent.vao = scene.baseCar.vao;
+      agent.scale = { x: 0.2, y: 0.2, z: 0.2 };
+
+      agent.color = [1.0, 0.0, 0.0, 1.0];
+      agent.oldPosArray = [...agent.posArray];
+      agent.rotation = { x: 0, y: directionToAngle(agent.dirActual || "Right"), z: 0 };
+      agent.oldRotation = { ...agent.rotation };
+
+      scene.addObject(agent);
+    }
+  }
+}
+
 function drawObject(gl, programInfo, object, viewProjectionMatrix) {
-  const scaMat = M4.scale(object.scaArray || object.scale || {x:1,y:1,z:1});
+  const scaMat = M4.scale(object.scaArray || object.scale || { x: 1, y: 1, z: 1 });
   const rotXMat = M4.rotationX(object.rotRad?.x || 0);
   const rotYMat = M4.rotationY(object.rotRad?.y || 0);
   const rotZMat = M4.rotationZ(object.rotRad?.z || 0);
-  const traMat = M4.translation(object.posArray || [0,0,0]);
+  const traMat = M4.translation(object.posArray || [0, 0, 0]);
 
   let transforms = M4.identity();
   transforms = M4.multiply(scaMat, transforms);
@@ -190,10 +233,8 @@ function drawObject(gl, programInfo, object, viewProjectionMatrix) {
     twgl.setUniforms(program, { u_transforms: wvpMat, u_color: object.color });
   }
 
-twgl.drawBufferInfo(gl, object.bufferInfo);
-
+  twgl.drawBufferInfo(gl, object.bufferInfo);
 }
-
 
 async function drawScene() {
   const now = Date.now();
@@ -218,7 +259,7 @@ async function drawScene() {
   if (elapsed >= duration) {
     elapsed = 0;
     await update();
-    updateSceneObj();
+    updateSceneObjects();
   }
 
   requestAnimationFrame(drawScene);
