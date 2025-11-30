@@ -5,7 +5,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
 from trafficBase.model import CityModel
-from trafficBase.agent import Agent, Traffic_Light, Destination, Obstacle, Road
+from trafficBase.agent import Car, Agent, Traffic_Light, Destination, Obstacle, Road, SideWalk
 
 # Simulation parameters
 number_agents = 10
@@ -50,14 +50,14 @@ def getAgents():
     global cityModel
     try:
         agentCells = cityModel.grid.all_cells.select(
-            lambda cell: any(isinstance(obj, Agent) for obj in cell.agents)
+            lambda cell: any(isinstance(obj, Car) for obj in cell.agents)
         ).cells
 
         agents = [
             (cell.coordinate, agent)
             for cell in agentCells
             for agent in cell.agents
-            if isinstance(agent, Agent)
+            if isinstance(agent, Car)
         ]
 
         # print(agentCells)
@@ -181,6 +181,33 @@ def getDestination():
     except Exception as e:
         print(e)
         return jsonify({"message": "Error with destination positions"}), 500
+    
+@app.route('/getSideWalks', methods=['GET'])
+@cross_origin()
+def getSideWalks():
+    global cityModel
+    try:
+        cells = cityModel.grid.all_cells.select(
+            lambda cell: any(isinstance(obj, SideWalk) for obj in cell.agents)
+        ).cells
+
+        agents = [
+            (cell.coordinate, agent)
+            for cell in cells
+            for agent in cell.agents
+            if isinstance(agent, SideWalk)
+        ]
+
+        positions = [
+            {"id": str(a.unique_id), "x": c[0], "y": 1, "z": c[1]}
+            for (c, a) in agents
+        ]
+
+        return jsonify({'positions': positions})
+
+    except Exception as e:
+        print(e)
+        return jsonify({"message": "Error with road positions"}), 500
 
 @app.route('/update', methods=['GET'])
 @cross_origin()
@@ -197,6 +224,6 @@ def updateModel():
         print(e)
         return jsonify({"message": "Error during model update"}), 500
 
-
+    
 if __name__ == '__main__':
     app.run(host="localhost", port=8585, debug=True)
