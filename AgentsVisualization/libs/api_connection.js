@@ -44,24 +44,35 @@ async function getAgents() {
         if (response.ok) {
             let result = await response.json();
 
-            if (agents.length === 0) {
-                console.log("carros creados", agents, result);
-                for (const agent of result.positions) {
-                    const newAgent = new Object3D(agent.id, [agent.x, agent.y, agent.z]);
-                    newAgent.oldPosArray = newAgent.posArray;
-                    agents.push(newAgent);
-                }
-            } else {
-                for (const agent of result.positions) {
-                    const current_agent = agents.find(a => a.id == agent.id);
+            console.log("carros recibidos:", result.positions);
 
-                    if (current_agent) {
-                        current_agent.oldPosArray = current_agent.posArray;
-                        current_agent.position = { x: agent.x, y: agent.y, z: agent.z };
-                    }
+            for (const agent of result.positions) {
+
+                let current = agents.find(a => a.id == agent.id);
+
+                if (!current) {
+                    // crear nuevo agente
+                    const newAgent = new Object3D(
+                        agent.id,
+                        [agent.x, agent.y, agent.z]
+                    );
+                    newAgent.oldPosArray = [...newAgent.posArray];
+                    agents.push(newAgent);
+
+                    console.log("Nuevo carro agregado:", newAgent);
+                } else {
+                    // actualizar
+                    current.oldPosArray = [...current.posArray];
+                    current.position = {
+                        x: agent.x,
+                        y: agent.y,
+                        z: agent.z
+                    };
                 }
             }
         }
+
+            
 
     } catch (error) {
         console.log(error);
