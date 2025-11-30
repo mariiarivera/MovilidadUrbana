@@ -11,6 +11,7 @@ const obstacles = [];
 const trafficLights = [];
 const road = [];
 const destination = [];
+const sidewalks = [];
 
 // Initial config
 const initData = {
@@ -132,6 +133,22 @@ async function getDestination() {
     }
 }
 
+async function getSideWalks() {
+    try {
+        let response = await fetch(agent_server_uri + "getSideWalks");
+
+        if (response.ok) {
+            let result = await response.json();
+            for (const s of result.positions) {
+                sidewalks.push(new Object3D(s.id, [s.x, s.y, s.z]));
+            }
+        }
+
+    } catch (error) {
+        console.log(error);
+    }
+}
+
 async function update() {
     try {
         let response = await fetch(agent_server_uri + "update");
@@ -150,7 +167,7 @@ async function update() {
 }
 
 export {
-    agents, obstacles, destination, road, trafficLights,
+    agents, obstacles, destination, road, trafficLights, sidewalks,
     initAgentsModel, update, getAgents, getObstacles,
-    getDestination, getRoad, getTrafficLights
+    getDestination, getRoad, getTrafficLights, getSideWalks
 };
