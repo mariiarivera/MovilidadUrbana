@@ -253,6 +253,13 @@ for (const d of destination) {
 }
 }
 
+function updateObject() {
+  // Update the objects in the scene after a step
+  
+
+  
+}
+
 // Draw an object with its corresponding transformations
 function drawObject(gl, programInfo, object, viewProjectionMatrix, fract) {
   // Prepare the vector for translation and scale

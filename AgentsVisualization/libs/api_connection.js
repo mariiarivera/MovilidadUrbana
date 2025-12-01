@@ -39,45 +39,54 @@ async function initAgentsModel() { //1
 
 async function getAgents() {
     try {
+        // Realiza una solicitud GET al servidor para obtener las posiciones de los agentes
         let response = await fetch(agent_server_uri + "getAgents");
 
+        // Verifica si la respuesta fue exitosa
         if (response.ok) {
+            // Parsea la respuesta como JSON
             let result = await response.json();
 
-            console.log("carros recibidos:", result.positions);
-
-            for (const agent of result.positions) {
-
-                let current = agents.find(a => a.id == agent.id);
-
-                if (!current) {
-                    // crear nuevo agente
-                    const newAgent = new Object3D(
-                        agent.id,
-                        [agent.x, agent.y, agent.z]
-                    );
-                    newAgent.oldPosArray = [...newAgent.posArray];
+            // Verifica si el array de agentes está vacío
+            if (agents.length == 0) {
+                // Si está vacío, crea nuevos agentes y agréguelos al array de agentes
+                for (const agent of result.positions) {
+                    const newAgent = new Object3D(agent.id, [agent.x, agent.y, agent.z]);
+                    // Almacena la posición inicial en oldPosArray
+                    newAgent['oldPosArray'] = [...newAgent.posArray];
                     agents.push(newAgent);
+                }
+                // Log de los agentes
+                console.log("Agentes iniciales:", agents);
 
-                    console.log("Nuevo carro agregado:", newAgent);
-                } else {
-                    // actualizar
-                    current.oldPosArray = [...current.posArray];
-                    current.position = {
-                        x: agent.x,
-                        y: agent.y,
-                        z: agent.z
-                    };
+            } else {
+                // Si ya existen agentes, actualiza sus posiciones
+                for (const agent of result.positions) {
+                    // Busca el agente actual en el array de agentes
+                    let current_agent = agents.find(o => o.id == agent.id);
+
+                    if (!current_agent) {
+                        // Si no existe, crea un nuevo agente y lo agrega
+                        const newAgent = new Object3D(agent.id, [agent.x, agent.y, agent.z]);
+                        newAgent.oldPosArray = [...newAgent.posArray];
+                        agents.push(newAgent);
+                    } else {
+                        // Si existe, actualiza la posición
+                        current_agent.oldPosArray = [...current_agent.posArray];
+                        current_agent.position = { x: agent.x, y: agent.y, z: agent.z };
+                        // Log de actualización
+                        console.log(`Agente actualizado: id = ${current_agent.id}, posición antigua =`, current_agent.oldPosArray, "nueva posición =", current_agent.posArray);
+                    }
                 }
             }
         }
 
-            
-
     } catch (error) {
-        console.log(error);
+        // Si ocurre un error, lo imprime
+        console.log("Error al obtener los agentes:", error);
     }
 }
+
 
 async function getObstacles() {
     try {
