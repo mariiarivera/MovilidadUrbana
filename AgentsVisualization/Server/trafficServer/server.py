@@ -25,6 +25,12 @@ def random_portrayal(agent):
         portrayal.update(("color", "gray"))
         portrayal.update(("marker", "s"), ("size", 125), ("zorder", 1))
 
+    if (isinstance(agent, Car)):
+        portrayal.color = "blue"
+        
+    if (isinstance(agent, SideWalk)):
+        portrayal.color = "white"
+
     return portrayal
 
 

@@ -45,6 +45,16 @@ class Traffic_Light(FixedAgent):
         if self.model.steps % self.timeToChange == 0:
             self.state = not self.state
 
+    @property
+    def is_green(self):
+        """Whether the traffic light is green."""
+        return self.state
+    
+    @is_green.setter
+    def is_green(self, value: bool) -> None:
+        """Set traffic light state."""
+        self.state = value
+
 class Destination(FixedAgent):
     """
     Destination agent. Where each car should go.
@@ -138,3 +148,19 @@ class Car(CellAgent):
     def step(self):
 
         self.move()
+
+class SideWalk(FixedAgent):
+    """
+    Sidewalk agent.
+    """
+    def __init__(self, model, cell):
+        """
+        Creates a new sidewalk.
+        
+        Args:
+            model: Model reference for the agent
+            cell: The initial position of the agent
+        """
+        super().__init__(model)
+        self.cell = cell
+
