@@ -197,7 +197,7 @@ function setupObjects(scene, gl, ProgramInfo) {
 
   for (const agent of trafficLights) {
     assignModelToAgents([agent], TrafficLight, {
-      scale: { x: 1, y: 1, z: 1 },
+      scale: { x: 0.5, y: 0.5, z: 0.5 },
       programType: 'texture',
       texture: null,
       rotRad: getTrafficLightRotation(agent.direction),
@@ -370,7 +370,7 @@ function drawObject(gl, programInfo, object, viewProjectionMatrix, fract) {
     u_shininess: object.shininess || 16.0,
     u_viewWorldPosition: scene.camera.posArray,
     u_lightWorldPosition: lights.map(l => l.position),
-    u_ambientLight: [0.2, 0.2, 0.2, 1.0],
+    u_ambientLight: [0.4, 0.4, 0.4, 1.0],
     u_diffuseLight: lights.map(l => l.diffuse),
     u_specularLight: lights.map(l => l.specular),
     u_constant: 1.0,
