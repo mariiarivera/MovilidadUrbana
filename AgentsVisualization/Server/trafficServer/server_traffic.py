@@ -5,7 +5,9 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
 from trafficBase.model import CityModel
+
 from trafficBase.agent import Car, Agent, Traffic_Light, Destination, Obstacle, Road, SideWalk
+
 
 # Simulation parameters
 number_agents = 10

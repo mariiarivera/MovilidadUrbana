@@ -335,6 +335,13 @@ function setupObjects(scene, gl, ProgramInfo) {
 
 }
 
+function updateObject() {
+  // Update the objects in the scene after a step
+  
+
+  
+}
+
 // Draw an object with its corresponding transformations
 function drawObject(gl, programInfo, object, viewProjectionMatrix, fract) {
   const v3_tra = object.posArray;

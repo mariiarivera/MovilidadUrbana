@@ -116,12 +116,12 @@ class CityModel(Model):
             self.totCarsSpawned += 1
 
             # Asegúrate de que spawn_cell esté definido
-            if spawn_cell is not None:
-                # Añadir el coche a la cuadrícula manualmente
-                x, y = spawn_cell.coordinate  # Obtiene las coordenadas de la celda
-                self.grid[(x, y)].agents.append(car)  # Asigna el coche a la celda
-            else:
-                print("No se pudo encontrar una celda válida para el coche.")
+            x, y = spawn_cell.coordinate
+            self.grid[(x, y)].agents.append(car)
+
+            # REGISTRARLO para que Mesa lo use en step()
+            self._agents[car.unique_id] = car
+
 
 
     def step(self):
