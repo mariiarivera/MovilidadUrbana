@@ -100,6 +100,9 @@ async function main() {
   // Prepare the user interface
   setupUI();
 
+  // update the scene objects
+  updateSceneObjects();
+
   // Fisrt call to the drawing loop
   drawScene();
 }
@@ -335,12 +338,72 @@ function setupObjects(scene, gl, ProgramInfo) {
 
 }
 
-function updateObject() {
-  // Update the objects in the scene after a step
+function updateSceneObjects() {
+  // Obtener los IDs actuales de los agentes, obstáculos, semáforos y caminos
+  const currentAgentIds = new Set(agents.map(agent => agent.id));
+  const obstacleIds = new Set(obstacles.map(obs => obs.id));
+  const trafficLightIds = new Set(trafficLights.map(light => light.id));
+  const roadIds = new Set(road.map(road => road.id));  // Aseguramos que 'road' sea la variable correcta
   
+  // Filtrar objetos en la escena basados en los IDs
+  scene.objects = scene.objects.filter(obj => {
+    if (obstacleIds.has(obj.id)) return true;  // Mantener obstáculos
+    if (trafficLightIds.has(obj.id)) return true;  // Mantener semáforos
+    if (roadIds.has(obj.id)) return true;  // Mantener caminos
+    if (obj.id < 0) return true;  // Mantener objetos con id negativo (por ejemplo, elementos estáticos)
+    return currentAgentIds.has(obj.id);  // Mantener solo agentes
+  });
 
-  
+
+  // Solo actualizar agentes (coches), no los objetos estáticos
+  for (const agent of agents) {
+    const existingObj = scene.objects.find(obj => obj.id === agent.id);
+    
+    if (existingObj) {
+      // Verificar que 'existingObj' tiene las propiedades necesarias antes de acceder
+      if (existingObj.posArray && existingObj.scaArray) {
+        existingObj.oldPosArray = [...existingObj.posArray];
+        existingObj.position = agent.position;
+        
+        // Determinar la dirección siguiente del agente
+        const nextDirection = agent.nextDir || agent.dirActual || "Down";
+        
+        // Si la dirección ha cambiado, actualizamos la rotación
+        if (existingObj.currentDirection !== nextDirection) {
+          const newAngle = directionToAngle(nextDirection);  // Calculamos el nuevo ángulo de rotación
+          
+          existingObj.oldRotY = existingObj.rotY;
+          existingObj.rotY = newAngle;
+          existingObj.currentDirection = nextDirection;
+        }
+      } else {
+        // Si alguna propiedad está faltando, logueamos un error y continuamos con el siguiente agente
+        console.error(`El objeto con id ${existingObj.id} no tiene las propiedades necesarias (posArray, scaArray).`);
+      }
+    } else {
+      // Si el agente no existe en la escena, lo creamos
+      agent.prepareVAO(gl, ProgramInfo);  // Asegúrate de que el modelo está cargado
+      // agent.prepareVAO(gl, ProgramInfo, carModels["0"].obj);  // Asegúrate de que el modelo está cargado
+      agent.scale = { x: 0.2, y: 0.2, z: 0.2 };  // Ajustamos el tamaño de los coches (escala)
+      
+      // Asignamos un color aleatorio al coche
+      agent.color = getRandomCarColor();
+      
+      // Establecemos la dirección inicial del coche
+      const initialDirection = agent.nextDir || agent.dirActual || "Down";
+      agent.currentDirection = initialDirection;
+      const initialAngle = directionToAngle(initialDirection);
+      
+      agent.oldRotY = initialAngle;
+      agent.rotY = initialAngle;
+      agent.oldPosArray = [...agent.posArray];
+      
+      // Añadimos el coche a la escena
+      scene.addObject(agent);
+    }
+  }
 }
+
 
 // Draw an object with its corresponding transformations
 function drawObject(gl, programInfo, object, viewProjectionMatrix, fract) {
