@@ -52,7 +52,8 @@ import {
   getTrafficLightOffset,
   updateTrafficLights,
   createBaseModelWithMtl,
-  assignModelToAgents
+  assignModelToAgents,
+  plant
 } from './objects.js';
 
 console.log('carModels:', carModels);
@@ -141,7 +142,7 @@ function setupObjects(scene, gl, ProgramInfo) {
   skybox.arrays = baseCube.arrays;
   skybox.bufferInfo = baseCube.bufferInfo;
   skybox.vao = baseCube.vao;
-  skybox.scale = { x: -50, y: -50, z: -50 };
+  skybox.scale = { x: -50, y: -100, z: -100 };
   skybox.programType = 'texture';
   skybox.texture = skyboxTexture;
   scene.addObject(skybox);
@@ -170,12 +171,18 @@ function setupObjects(scene, gl, ProgramInfo) {
   const ObstacleOne = createBaseModelWithMtl(5, gl, ProgramInfo, buildingModels["0"].obj, buildingModels["0"].mtl);
   const ObstacleTwo = createBaseModelWithMtl(6, gl, ProgramInfo, buildingModels["1"].obj, buildingModels["1"].mtl);
   const ObstacleThree = createBaseModelWithMtl(7, gl, ProgramInfo, buildingModels["2"].obj, buildingModels["2"].mtl);
+  const ObstacleFour = createBaseModelWithMtl(8, gl, ProgramInfo, buildingModels["3"].obj, buildingModels["3"].mtl);
+  const ObstacleFive = createBaseModelWithMtl(9, gl, ProgramInfo, buildingModels["4"].obj, buildingModels["4"].mtl);
+  const ObstacleSix = createBaseModelWithMtl(10, gl, ProgramInfo, buildingModels["5"].obj, buildingModels["5"].mtl);
 
-  const obstaclesArray = [ObstacleOne, ObstacleTwo, ObstacleThree];
+  const obstaclesArray = [ObstacleOne, ObstacleTwo, ObstacleThree, ObstacleFour, ObstacleFive, ObstacleSix];
   const buildingProperties = [
     { scale: { x: 0.5, y: 0.5, z: 0.5 }, shininess: 16.0, texture: BuildingTextureOne },
     { scale: { x: 0.5, y: 0.5, z: 0.5 }, shininess: 16.0, texture: BuildingTextureTwo },
     { scale: { x: 0.35, y: 0.5, z: 0.35 }, shininess: 32.0, texture: BuildingTextureThree },
+    { scale: { x: 0.35, y: 0.5, z: 0.35 }, shininess: 32.0, texture: BuildingTextureTwo },
+    { scale: { x: 0.09, y: 0.3, z: 0.05 }, shininess: 32.0, texture: BuildingTextureOne },
+    { scale: { x: 0.005, y: 0.005, z: 0.005 }, shininess: 16.0, texture: BuildingTextureThree },
   ]
     for (const agent of obstacles) {
     const randomIndex = Math.floor(Math.random() * obstaclesArray.length); 
@@ -274,7 +281,7 @@ function setupObjects(scene, gl, ProgramInfo) {
     }
 
     lightCube.position = { x: pos.x + offsetX, y: heightOffset, z: pos.z + offsetZ };
-    lightCube.scale = { x: 0.05, y: 0.1, z: 0.05 };
+    lightCube.scale = { x: 0.0005, y: 0.1, z: 0.0005 };
 
     // Set texture and color based on state
     lightCube.shininess = 16.0;
@@ -303,7 +310,7 @@ function setupObjects(scene, gl, ProgramInfo) {
     assignModelToAgents([agent], Road, {
       scale: { x: 0.5, y: 1, z: 0.5 },
       programType: 'texture',
-      texture: null,
+      texture: sidewalkTexture,
       rotRad: getRotationByDirection(agent.direction),
     });
 
@@ -325,9 +332,9 @@ function setupObjects(scene, gl, ProgramInfo) {
 
   for (const agent of destination) {
     assignModelToAgents([agent], baseDestination, {
-      scale: { x: 2, y: 2, z: 2 },
+      scale: { x: 0.5, y: 0.8, z: 0.5 },
       programType: 'texture',
-      texture: destinationTexture,
+      texture: plant,
     });
 
     scene.addObject(agent);
@@ -367,23 +374,32 @@ function drawObject(gl, programInfo, object, viewProjectionMatrix, fract) {
 
   // Prepare light uniforms
   const lights = scene.lights;
-  const numLights = lights.length;
+const lightPositions = [];
+const diffuseLights = [];
+const specularLights = [];
 
-  const uniforms = {
-    u_world: transforms,
-    u_worldInverseTransform: normalMat,
-    u_worldViewProjection: wvpMat,
-    u_texture: object.texture || null,
-    u_shininess: object.shininess || 16.0,
-    u_viewWorldPosition: scene.camera.posArray,
-    u_lightWorldPosition: lights.map(l => l.position),
-    u_ambientLight: [0.4, 0.4, 0.4, 1.0],
-    u_diffuseLight: lights.map(l => l.diffuse),
-    u_specularLight: lights.map(l => l.specular),
-    u_constant: 1.0,
-    u_linear: 0.09,
-    u_quadratic: 0.032
-  };
+for (const l of lights) {
+  lightPositions.push(...l.posArray);  // flatten vec3
+  diffuseLights.push(...l.diffuse);    // flatten vec4
+  specularLights.push(...l.specular);  // flatten vec4
+}
+
+
+const uniforms = {
+  u_world: transforms,
+  u_worldInverseTransform: normalMat,
+  u_worldViewProjection: wvpMat,
+  u_texture: object.texture || null,
+  u_shininess: object.shininess || 16.0,
+  u_viewWorldPosition: scene.camera.posArray,
+  u_lightWorldPosition: lightPositions,
+  u_ambientLight: [0.4, 0.4, 0.4, 1.0],
+  u_diffuseLight: diffuseLights,
+  u_specularLight: specularLights,
+  u_constant: 1.0,
+  u_linear: 0.09,
+  u_quadratic: 0.032
+};
 
   twgl.setUniforms(programInfo, uniforms);
   gl.bindVertexArray(object.vao);
