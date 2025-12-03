@@ -24,8 +24,8 @@ import trafficLightsObj from '../assets/models/stoplight_1.obj?raw';
 import trafficLightsMtl from '../assets/models/stoplight_1.mtl?raw';
 
 // Destination
-import destinationObj from '../assets/models/fatCat.obj?raw';
-import destinationMtl from '../assets/models/fatCat.mtl?raw';
+import destinationObj from '../assets/models/SlimCat.obj?raw';
+import destinationMtl from '../assets/models/SlimCat.mtl?raw';
 
 // Obstacles 
 import buildingOneObj from '../assets/models/building_1.obj?raw';
@@ -36,6 +36,7 @@ import buildingThreeObj from '../assets/models/building_2.obj?raw';
 import buildingThreeMtl from '../assets/models/building_2.mtl?raw';
 import buildingFourObj from '../assets/models/Building,.obj?raw';
 import buildingFourMtl from '../assets/models/Building,.mtl?raw';
+
 
 // Cars
 import car1Obj from '../assets/models/car.obj?raw';
@@ -123,13 +124,13 @@ function setupScene() {
   scene.setCamera(camera);
   scene.camera.setupControls();
 
-  let light = new Light3D(
-    [14, 20, 14],          // Position
-    [0.6, 0.6, 1.0, 1.0], // Ambient
-    [0.2, 0.2, 0.2, 1.0], // Diffuse
-    [0.5, 0.5, 0.5, 1.0], // Specular
-  );
-  scene.addLight(light);
+let light = new Light3D(
+  [14, 40, 14],                // Posición alta, efecto de luna
+  [0.9, 0.9, 0.9, 1.0],        // Ambient azulada (SimCity vibe)
+  [0.9, 0.9, 1.0, 1.0],        // Difusa muy clara
+  [1.0, 1.0, 1.0, 1.0]         // Especular brillante
+);
+scene.addLight(light);
 }
 
 function setupObjects(scene, gl, programInfo) {
@@ -188,10 +189,12 @@ const buildingModels = [
 const loadedBuildings = [];
 
 for (let i = 0; i < buildingModels.length; i++) {
-  const arrays = loadObj(buildingModels[i].obj);   // load vertex data from OBJ
+  
   const materials = loadMtl(buildingModels[i].mtl); // load MTL data
-  const vaoObj = new Object3D(-(100 + i));        // unique ID
+  const arrays = loadObj(buildingModels[i].obj);   // load vertex data from OBJ
 
+
+  const vaoObj = new Object3D(-(100 + i));        // unique ID
   // Assign OBJ arrays directly (do NOT call prepareVAO with no argument!)
   vaoObj.arrays = arrays;
   vaoObj.bufferInfo = twgl.createBufferInfoFromArrays(gl, vaoObj.arrays);
@@ -212,6 +215,7 @@ for (let i = 0; i < buildingModels.length; i++) {
   });
 }
 
+/*
 // Assign models to obstacles
 for (const obstacle of obstacles) {
   const rand = Math.floor(Math.random() * loadedBuildings.length);
@@ -221,7 +225,7 @@ for (const obstacle of obstacles) {
   obstacle.bufferInfo = chosen.bufferInfo;
   obstacle.vao = chosen.vao;
 
-  obstacle.scale = { x: 0.5, y: 0.5, z: 0.5 };
+  obstacle.scale = { x: 0.5, y: 1, z: 0.5 };
   obstacle.texture = chosen.texture;
   obstacle.color = [1, 1, 1, 1];
   obstacle.programType = 'texture';
@@ -229,6 +233,7 @@ for (const obstacle of obstacles) {
 
   scene.addObject(obstacle);
 }
+
 // Load road geometry and materials
 const roadArrays = loadObj(roadObj);
 const roadMaterials = loadMtl(roadMtl);
@@ -244,14 +249,14 @@ for (const road of roads) {
   road.arrays = roadArrays;
   road.bufferInfo = roadObj3D.bufferInfo;
   road.vao = roadObj3D.vao;
-  road.scale = { x: 1, y: 1, z: 1 }; // adjust as needed
+  road.scale = { x: 1, y: 2, z: 1 }; // adjust as needed
   road.texture = roadTexture;
   road.color = [1, 1, 1, 1];
   road.programType = 'texture';
   road.rotRad = getRotationByDirection(road.direction);
   scene.addObject(road);
 }
-
+*/
 
 const catArrays = loadObj(destinationObj);
 const catMaterials = loadMtl(destinationMtl);
@@ -375,6 +380,7 @@ trafficLightObj3D.prepareVAO(gl, colorProgramInfo);
 
 // Sincronizar nuevos agentes que aparezcan después del primer frame
 function syncNewAgentsInScene() {
+  /*
   for (const agent of agents) {
     const exists = scene.objects.find(obj => obj.id === agent.id);
     if (!exists) {
@@ -389,6 +395,7 @@ function syncNewAgentsInScene() {
       console.log("New car added:", agent.id);
     }
   }
+  */
 }
 
 
@@ -526,6 +533,13 @@ async function drawScene() {
 
   const sceneLights = scene.lights.slice(1);
 
+  function pad(arr, targetSize) {
+  while (arr.length < targetSize * 4) {
+    arr.push(0,0,0,0);
+  }
+  return arr;
+}
+
   // Prepare light arrays for the shader
   let lightPositions = [];
   let diffuseLights = [];
@@ -540,6 +554,14 @@ async function drawScene() {
     specularLights.push(...light.specular);
   }
 
+diffuseLights = pad(diffuseLights, 27);
+specularLights = pad(specularLights, 27);
+
+while (lightPositions.length < 27 * 3) {
+    lightPositions.push(0,0,0);
+}
+
+
     let uniforms = {
     u_viewWorldPosition: scene.camera.posArray,
     u_lightWorldPosition: lightPositions,
@@ -550,8 +572,8 @@ async function drawScene() {
     u_diffuseLight: diffuseLights,
     u_specularLight: specularLights,
     u_constant: 1.0,
-    u_linear: 0.15,
-    u_quadratic: 0.15,
+    u_linear: 0.4,
+    u_quadratic: 0.01,
   };
 
   // Draw objects
