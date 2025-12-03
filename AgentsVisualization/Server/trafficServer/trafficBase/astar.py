@@ -1,7 +1,5 @@
 from typing import List, Tuple, Dict
-import numpy as np
 import heapq
-from math import sqrt
 
 def create_node(position, g=float('inf'), h=0.0, parent=None):
     return {
@@ -13,14 +11,13 @@ def create_node(position, g=float('inf'), h=0.0, parent=None):
     }
 
 def heuristic(a, b):
-    return abs(a[0]-b[0]) + abs(a[1]-b[1])   # Manhattan por calles
+    return abs(a[0]-b[0]) + abs(a[1]-b[1])   # Manhattan
 
-def get_valid_neighbors(position, road_dir_grid):
-    """
-    road_dir_grid: matriz con una letra en cada celda:
-      '>' '<' '^' 'v' o None si no es carretera
-    """
+def get_valid_neighbors(position, road_dir_grid, goal):
     x, y = position
+    rows = len(road_dir_grid)
+    cols = len(road_dir_grid[0])
+
     dirs = {
         '>': (1, 0),
         '<': (-1, 0),
@@ -29,17 +26,21 @@ def get_valid_neighbors(position, road_dir_grid):
     }
 
     direction = road_dir_grid[x][y]
+
     if direction is None:
         return []
 
     dx, dy = dirs[direction]
-    nx, ny = x+dx, y+dy
-
-    rows = len(road_dir_grid)
-    cols = len(road_dir_grid[0])
+    nx, ny = x + dx, y + dy
 
     if 0 <= nx < rows and 0 <= ny < cols:
-        if road_dir_grid[nx][ny] is not None:  # debe ser carretera también
+
+        # ✔ Permitir entrar a la meta aunque no sea carretera
+        if (nx, ny) == goal:
+            return [(nx, ny)]
+
+        # ✔ Solo permitir movernos a otras calles dirigidas
+        if road_dir_grid[nx][ny] is not None:
             return [(nx, ny)]
 
     return []
@@ -53,6 +54,8 @@ def reconstruct(goal_node):
     return path[::-1]
 
 def find_path_with_directions(road_dir_grid, start, goal):
+
+    # ✔ START debe ser carretera, GOAL ya no
     if road_dir_grid[start[0]][start[1]] is None:
         return []
 
@@ -71,7 +74,8 @@ def find_path_with_directions(road_dir_grid, start, goal):
 
         closed.add(current_pos)
 
-        for nb in get_valid_neighbors(current_pos, road_dir_grid):
+        for nb in get_valid_neighbors(current_pos, road_dir_grid, goal):
+
             if nb in closed:
                 continue
 

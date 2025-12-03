@@ -380,7 +380,7 @@ trafficLightObj3D.prepareVAO(gl, colorProgramInfo);
 
 // Sincronizar nuevos agentes que aparezcan después del primer frame
 function syncNewAgentsInScene() {
-  /*
+  
   for (const agent of agents) {
     const exists = scene.objects.find(obj => obj.id === agent.id);
     if (!exists) {
@@ -395,7 +395,7 @@ function syncNewAgentsInScene() {
       console.log("New car added:", agent.id);
     }
   }
-  */
+
 }
 
 
