@@ -1,4 +1,7 @@
 from mesa.discrete_space import CellAgent, FixedAgent
+import numpy as np
+from .astar import find_path_with_directions
+
 
 class Agent(CellAgent):
     """
@@ -100,54 +103,56 @@ class Road(FixedAgent):
         self.direction = direction
 
 class Car(CellAgent):
-    """
-    Car agent that moves in the direction of the Road cell it's on.
-    """
-    def __init__(self, model, cell, unique_id=None,dest=None):
+    def __init__(self, model, cell, unique_id=None, dest=None):
         super().__init__(model)
         self.cell = cell
-
         self.unique_id = unique_id
-        
         self.dest = dest
 
+        self.path = []
+        self.path_index = 0
+
+        self.compute_path()
+
+    def compute_path(self):
+        start = self.cell.coordinate
+        goal = self.dest.coordinate
+
+        dir_grid = self.model.get_direction_grid()
+
+        path = find_path_with_directions(dir_grid, start, goal)
+
+        if path:
+            self.path = path
+            self.path_index = 1
+            print(f"Car {self.unique_id} path OK")
+        else:
+            print(f"Car {self.unique_id} could not find path")
+
     def move(self):
-        x, y = self.cell.coordinate
-        current_cell = self.model.grid[x, y]
-    
-        #saber donde esta la road 
-        road = next((agent for agent in current_cell.agents if isinstance(agent, Road)), None)
-
-        if road is None:
-            return 
-        # mover segun la direccion 
-
-        direction = road.direction
-        dx, dy = 0, 0
-        if direction == "Up":
-            dy = 1
-        elif direction == "Down":
-            dy = -1
-        elif direction == "Left":
-            dx = -1
-        elif direction == "Right":
-            dx = 1
-
-        next_pos = (x + dx, y + dy)
-
-        # no pasar por obstaculos
-        next_cell = self.model.grid[next_pos]
-        if any(isinstance(a, Obstacle) for a in next_cell.agents):
+        if not self.path or self.path_index >= len(self.path):
             return
 
-        # moverse 
+        next_pos = self.path[self.path_index]
         next_cell = self.model.grid[next_pos]
+
+        # 1. Semáforo rojo
+        tl = next((a for a in next_cell.agents if isinstance(a, Traffic_Light)), None)
+        if tl and not tl.is_green:
+            return
+
+        # 2. Carro enfrente
+        if any(isinstance(a, Car) for a in next_cell.agents):
+            return
+
+        # 3. Avanzar
         self.cell = next_cell
-        print(f"Car {self.unique_id} moved to {next_pos}")
+        self.path_index += 1
 
     def step(self):
-
         self.move()
+
+
 
 class SideWalk(FixedAgent):
     """
