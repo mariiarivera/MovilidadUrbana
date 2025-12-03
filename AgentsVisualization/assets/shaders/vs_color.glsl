@@ -1,16 +1,12 @@
 #version 300 es
 
 in vec4 a_position;
-in vec4 a_color;      // vertex color
-in vec2 a_texcoord;   // texture coordinates
+out vec3 v_texCoord;
 
-uniform mat4 u_transforms;
-
-out vec4 v_color;
-out vec2 v_texcoord;
+uniform mat4 u_viewDirectionProjectionInverse;
 
 void main() {
-    gl_Position = u_transforms * a_position; // apply model-view-projection
-    v_color = a_color;        // pass vertex color
-    v_texcoord = a_texcoord;  // pass texcoord for sampling in fragment shader
+  gl_Position = a_position;
+  gl_Position.z = 1.0; // Asegurar que el skybox esté al fondo
+  v_texCoord = (u_viewDirectionProjectionInverse * a_position).xyz;
 }
