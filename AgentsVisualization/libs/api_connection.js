@@ -171,6 +171,7 @@ async function getTrafficLights() {
                 const newTrafficLight = new Object3D(tl.id, [tl.x, tl.y, tl.z]);
                 trafficLights.push(newTrafficLight); // <- outer array
             }
+            // console.log("Obstacles:", obstacles);
         }
 
     } catch (error) {

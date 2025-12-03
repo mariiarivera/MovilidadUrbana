@@ -1,5 +1,6 @@
 from mesa import Model
 from mesa.discrete_space import OrthogonalMooreGrid
+import numpy as np
 from .agent import *
 import json
 import random
@@ -121,6 +122,44 @@ class CityModel(Model):
 
             # REGISTRARLO para que Mesa lo use en step()
             self._agents[car.unique_id] = car
+
+    def get_astar_grid(self):
+        grid = np.ones((self.width, self.height), dtype=int)
+
+        for x in range(self.width):
+            for y in range(self.height):
+                cell = self.grid[(x, y)]
+                
+                if any(isinstance(a, Road) for a in cell.agents):
+                    grid[x, y] = 0   # walkable road
+
+                # Destinations are also walkable
+                if any(isinstance(a, Destination) for a in cell.agents):
+                    grid[x, y] = 0
+        return grid
+
+    
+    def get_direction_grid(self):
+        grid = [[None for _ in range(self.height)] for _ in range(self.width)]
+
+        for x in range(self.width):
+            for y in range(self.height):
+                cell = self.grid[(x, y)]
+                road = next((a for a in cell.agents if isinstance(a, Road)), None)
+
+                if road is not None:
+                    direction = road.direction  # "Right", "Left", "Up", "Down"
+
+                    if direction == "Right":
+                        grid[x][y] = '>'
+                    elif direction == "Left":
+                        grid[x][y] = '<'
+                    elif direction == "Up":
+                        grid[x][y] = '^'
+                    elif direction == "Down":
+                        grid[x][y] = 'v'
+
+        return grid
 
 
 
