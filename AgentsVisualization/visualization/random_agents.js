@@ -17,6 +17,7 @@ import { Object3D } from '../libs/object3d';
 import { Camera3D } from '../libs/camera3d';
 import { loadMtl, loadObj } from '../libs/obj_loader.js';
 import { Light3D } from '../libs/light3d.js';
+import { getRotationByDirection, getTrafficLightRotation, updateTrafficLights } from './objects.js';
 
 // Traffic Lights
 import trafficLightsObj from '../assets/models/stoplight_1.obj?raw';
@@ -40,6 +41,10 @@ import buildingFourMtl from '../assets/models/Building,.mtl?raw';
 import car1Obj from '../assets/models/car.obj?raw';
 import car1Mtl from '../assets/models/car.mtl?raw';
 
+// Roads
+import roadObj from '../assets/models/untitled.obj?raw';
+import roadMtl from '../assets/models/untitled.mtl?raw';
+
 // Functions and arrays for the communication with the API
 import {
   agents, obstacles, roads, destinations, trafficLights, initAgentsModel, 
@@ -50,10 +55,15 @@ import {
 import vsGLSL from '../assets/shaders/vs_multi_lights_attenuation.glsl?raw';
 import fsGLSL from '../assets/shaders/fs_multi_lights_attenuation.glsl?raw';
 
+// Shaders for skybox
+import vsSkyboxGLSL from '../assets/shaders/vs_color.glsl?raw';
+import fsSkyboxGLSL from '../assets/shaders/fs_color.glsl?raw';
+
 const scene = new Scene3D();
 
 // Global variables
 let colorProgramInfo = undefined;
+let skyboxProgramInfo = undefined;
 let gl = undefined;
 const duration = 10; // ms
 let elapsed = 0;
@@ -72,6 +82,7 @@ async function main() {
 
   // Prepare the program with the shaders
   colorProgramInfo = twgl.createProgramInfo(gl, [vsGLSL, fsGLSL]);
+  skyboxProgramInfo = twgl.createProgramInfo(gl, [vsSkyboxGLSL, fsSkyboxGLSL]);
 
   // Initialize the agents model (Mesa)
   await initAgentsModel();
@@ -129,9 +140,20 @@ function setupObjects(scene, gl, programInfo) {
         src: src,
       });
     }
+
   // Create VAO for the base cube
   baseCube = new Object3D(-1);
   baseCube.prepareVAO(gl, programInfo);
+
+  const skyboxTexture = createTexture(gl, '../assets/models/skyboxpic.jpg');
+  let skybox = new Object3D(3);
+  skybox.arrays = baseCube.arrays;
+  skybox.bufferInfo = twgl.createBufferInfoFromArrays(gl, skybox.arrays);
+  skybox.vao = twgl.createVAOFromBufferInfo(gl, skyboxProgramInfo, skybox.bufferInfo);
+  skybox.scale = { x: -50, y: -50, z: -50 };
+  skybox.programType = 'skybox';
+  skybox.texture = skyboxTexture;
+  scene.addObject(skybox);
 
   const carTexture = createTexture(gl, '../assets/textures/Cars/Tyre.png');
   // Load car geometry
@@ -147,7 +169,7 @@ function setupObjects(scene, gl, programInfo) {
     agent.arrays = carArrays;
     agent.bufferInfo = carObj3D.bufferInfo;
     agent.vao = carObj3D.vao;
-    agent.scale = { x: 0.5, y: 0.5, z: 0.5 }; // adjust as needed
+    agent.scale = { x: 0.5, y: 2, z: 0.5 }; 
     agent.texture = carTexture;
     agent.programType = 'texture';
     agent.color = [1, 1, 1, 1];
@@ -207,19 +229,29 @@ for (const obstacle of obstacles) {
 
   scene.addObject(obstacle);
 }
+// Load road geometry and materials
+const roadArrays = loadObj(roadObj);
+const roadMaterials = loadMtl(roadMtl);
+const roadObj3D = new Object3D(-20);
+roadObj3D.arrays = roadArrays;
+roadObj3D.bufferInfo = twgl.createBufferInfoFromArrays(gl, roadArrays);
+roadObj3D.vao = twgl.createVAOFromBufferInfo(gl, colorProgramInfo, roadObj3D.bufferInfo);
 
-  for (const road of roads) {
-    road.arrays = baseCube.arrays;
-    road.bufferInfo = baseCube.bufferInfo;
-    road.vao = baseCube.vao;
-    road.scale = { x: 0.5, y: 0.01, z: 0.5 };
-    road.color = [0.2, 0.5, 0.5, 1.0];
-    road.position.y += 0.4;
-    if (road.posArray) {
-      road.posArray[1] = road.position.y;
-    }
-    scene.addObject(road);
-  }
+const roadTexture = createTexture(gl, '../assets/textures/Road/render.png'); // your road texture
+
+// Assign models to roads
+for (const road of roads) {
+  road.arrays = roadArrays;
+  road.bufferInfo = roadObj3D.bufferInfo;
+  road.vao = roadObj3D.vao;
+  road.scale = { x: 1, y: 1, z: 1 }; // adjust as needed
+  road.texture = roadTexture;
+  road.color = [1, 1, 1, 1];
+  road.programType = 'texture';
+  road.rotRad = getRotationByDirection(road.direction);
+  scene.addObject(road);
+}
+
 
 const catArrays = loadObj(destinationObj);
 const catMaterials = loadMtl(destinationMtl);
@@ -259,6 +291,7 @@ trafficLightObj3D.prepareVAO(gl, colorProgramInfo);
     tl.vao = trafficLightObj3D.vao;
     tl.scale = { x: 1, y: 1, z: 1 };
     tl.texture = null;
+    tl.rotRad = getTrafficLightRotation(tl.direction);
     scene.addObject(tl);
   }
 
@@ -286,7 +319,6 @@ trafficLightObj3D.prepareVAO(gl, colorProgramInfo);
         break;
     }
 
-    // Select color based on state
     const lightColor = tl.state
       ? [0.0, 0.8, 0.0, 1.0] // Green
       : [0.8, 0.0, 0.0, 1.0]; // Red
@@ -294,23 +326,20 @@ trafficLightObj3D.prepareVAO(gl, colorProgramInfo);
     // Create the light
     let light = new Light3D(
       [pos.x + offsetX, heightOffset, pos.z + offsetZ],
-      [0.1, 0.1, 0.1, 1.0], // Ambient
-      lightColor, // Diffuse
-      lightColor, // Specular
+      [0.1, 0.1, 0.1, 1.0], 
+      lightColor, 
+      lightColor, 
     );
 
-    // Store reference to light in traffic light object
     tl.light = light;
     scene.addLight(light);
   }
 
-  // Create light emitter cubes for each traffic light
   for (const tl of trafficLights) {
     const lightCube = new Object3D(13);
     const pos = tl.position;
     const heightOffset = pos.y + 0.8;
 
-    // Get offset based on direction to align with semaphore
     let offsetX = 0;
     let offsetZ = 0;
 
@@ -330,7 +359,7 @@ trafficLightObj3D.prepareVAO(gl, colorProgramInfo);
     }
 
     lightCube.position = { x: pos.x + offsetX, y: heightOffset, z: pos.z + offsetZ };
-    lightCube.scale = { x: 0.05, y: 0.1, z: 0.05 };
+    lightCube.scale = { x: 0.05, y: 0.5, z: 0.05 };
     lightCube.shininess = 16.0;
     lightCube.programType = 'texture';
     lightCube.color = [1.0, 1.0, 1.0, 1.0]; // White so texture shows properly
@@ -358,9 +387,9 @@ function syncNewAgentsInScene() {
     const exists = scene.objects.find(obj => obj.id === agent.id);
     if (!exists) {
       agent.arrays = carArrays;
-      agent.bufferInfo = carObj3D.bufferInfo;
-      agent.vao = carObj3D.vao;
-      agent.scale = { x: 0.5, y: 0.5, z: 0.5 };
+      agent.bufferInfo = car1Obj.bufferInfo;
+      agent.vao = car1Obj.vao;
+      agent.scale = { x: 0.5, y: 1.5, z: 0.5 };
       agent.texture = carTexture;
       agent.programType = 'texture';
       agent.color = [1, 1, 1, 1];
@@ -387,6 +416,22 @@ function drawObject(gl, programInfo, object, viewProjectionMatrix, fract) {
 
   // Escala
   let v3_sca = object.scaArray || [1, 1, 1];
+
+  // interpolation for rotation
+
+const newRot = object.targetRotY;
+const oldRot = object.oldRotY;
+
+// Default to current rotation
+let rotY = object.rotRad.y;
+
+if (newRot !== undefined && oldRot !== undefined) {
+  // Compute shortest angular difference
+  let deltaRot = ((newRot - oldRot + Math.PI) % (2 * Math.PI)) - Math.PI;
+
+  // Interpolate rotation
+  rotY = oldRot + deltaRot * fract;
+}
 
   // Create the individual transform matrices
   const scaMat = M4.scale(v3_sca);
@@ -426,6 +471,15 @@ function drawObject(gl, programInfo, object, viewProjectionMatrix, fract) {
 
 // Function to do the actual display of the objects
 async function drawScene() {
+      function createTexture(gl, src) {
+      return twgl.createTexture(gl, {
+        min: gl.LINEAR,
+        mag: gl.LINEAR,
+        src: src,
+      });
+    }
+  const greenTexture = createTexture(gl, '../assets/textures/Trafficlights/green.png');
+  const redTexture = createTexture(gl, '../assets/textures/Trafficlights/red.png');
   // Compute time elapsed since last frame
   let now = Date.now();
   let deltaTime = now - then;
@@ -433,6 +487,7 @@ async function drawScene() {
   let fract = Math.min(1.0, elapsed / duration);
   then = now;
 
+  updateTrafficLights(trafficLights, greenTexture, redTexture);
   // Clear the canvas
   gl.clearColor(0, 0, 0, 1);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -442,6 +497,34 @@ async function drawScene() {
 
   scene.camera.checkKeys();
   const viewProjectionMatrix = setupViewProjection(gl);
+
+   // Draw the skybox **first**
+  gl.depthFunc(gl.LEQUAL);  // allow skybox behind everything
+  gl.disable(gl.CULL_FACE); 
+
+  gl.useProgram(skyboxProgramInfo.program);
+
+  for (const object of scene.objects.filter(obj => obj.programType === 'skybox')) {
+      const viewMatNoTranslation = [...viewProjectionMatrix];
+      // Remove camera translation so skybox stays centered
+      viewMatNoTranslation[12] = 0;
+      viewMatNoTranslation[13] = 0;
+      viewMatNoTranslation[14] = 0;
+
+      const wvpMat = M4.multiply(viewMatNoTranslation, 
+                                 M4.scale([object.scale.x, object.scale.y, object.scale.z]));
+      
+      twgl.setUniforms(skyboxProgramInfo, {
+          u_worldViewProjection: wvpMat,
+          u_texture: object.texture
+      });
+
+      gl.bindVertexArray(object.vao);
+      twgl.drawBufferInfo(gl, object.bufferInfo);
+  }
+
+  gl.enable(gl.CULL_FACE);
+  gl.depthFunc(gl.LESS);
 
   // Revisar si hay agentes nuevos desde el servidor
   syncNewAgentsInScene();

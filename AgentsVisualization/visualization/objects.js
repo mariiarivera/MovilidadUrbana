@@ -83,7 +83,7 @@ export function initTextures(gl) {
   BuildingTextureThree = createTexture(gl, '../assets/textures/Building/building_normals.png');
   destinationTexture = createTexture(gl, '../assets/textures/Destination/bishop.jpg')
   carOneTexture = createTexture(gl, '../assets/textures/Cars/Tyre.png');
- greenTexture = createTexture(gl, '../assets/textures/Trafficlights/green.png');
+  greenTexture = createTexture(gl, '../assets/textures/Trafficlights/green.png');
   redTexture = createTexture(gl, '../assets/textures/Trafficlights/red.png'); 
   plant = createTexture(gl, '../assets/textures/Destination/indoorplant_2_vl.jpg');
   BuildingTextureFour = createTexture(gl, '../assets/textures/Building/BrickSmallBrown0155_1_S.jpg');
