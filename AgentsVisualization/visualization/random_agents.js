@@ -1,11 +1,11 @@
-/*
+/* 
  * Base program for a 3D scene that connects to an API to get the movement
  * of agents.
- * The scene shows a city model
- * Amilka Lopez and Maria RIvera
+ * The scene shows colored cubes
+ *
+ * Gilberto Echeverria
  * 2025-11-08
  */
-
 
 'use strict';
 
@@ -15,59 +15,52 @@ import { M4 } from '../libs/3d-lib';
 import { Scene3D } from '../libs/scene3d';
 import { Object3D } from '../libs/object3d';
 import { Camera3D } from '../libs/camera3d';
+import { loadMtl, loadObj } from '../libs/obj_loader.js';
 import { Light3D } from '../libs/light3d.js';
-import { cubeTextured } from '../libs/shapes';
+
+// Traffic Lights
+import trafficLightsObj from '../assets/models/stoplight_1.obj?raw';
+import trafficLightsMtl from '../assets/models/stoplight_1.mtl?raw';
+
+// Destination
+import destinationObj from '../assets/models/fatCat.obj?raw';
+import destinationMtl from '../assets/models/fatCat.mtl?raw';
+
+// Obstacles 
+import buildingOneObj from '../assets/models/building_1.obj?raw';
+import buildingOneMtl from '../assets/models/building_1.mtl?raw';
+import buildingTwoObj from '../assets/models/building_1.obj?raw';
+import buildingTwoMtl from '../assets/models/building_1.mtl?raw';
+import buildingThreeObj from '../assets/models/building_2.obj?raw';
+import buildingThreeMtl from '../assets/models/building_2.mtl?raw';
+import buildingFourObj from '../assets/models/Building,.obj?raw';
+import buildingFourMtl from '../assets/models/Building,.mtl?raw';
+
+// Cars
+import car1Obj from '../assets/models/car.obj?raw';
+import car1Mtl from '../assets/models/car.mtl?raw';
 
 // Functions and arrays for the communication with the API
 import {
-  agents, obstacles, trafficLights, road, destination, sidewalks, initAgentsModel,
-  update, getAgents, getTrafficLights, getDestination, getRoad, getObstacles, getSideWalks
+  agents, obstacles, roads, destinations, trafficLights, initAgentsModel, 
+  update, getAgents, getObstacles, getRoads, getDestinations, getTrafficLights
 } from '../libs/api_connection.js';
-
 
 // Define the shader code, using GLSL 3.00
 import vsGLSL from '../assets/shaders/vs_multi_lights_attenuation.glsl?raw';
 import fsGLSL from '../assets/shaders/fs_multi_lights_attenuation.glsl?raw';
 
-// Import OBJ and MTL and Textures
-import {
-  buildingModels,
-  destinationModel,
-  carModels,
-  trafficLightModel,
-  roadModel,
-  skyboxTexture,
-  sidewalkTexture,
-  BuildingTextureOne,
-  BuildingTextureTwo,
-  BuildingTextureThree,
-  carOneTexture,
-  greenTexture,
-  redTexture,
-  destinationTexture,
-  initTextures,
-  getRotation,
-  getRotationByDirection,
-  getTrafficLightRotation,
-  getTrafficLightOffset,
-  updateTrafficLights,
-  createBaseModelWithMtl,
-  assignModelToAgents,
-  plant
-} from './objects.js';
-
-console.log('carModels:', carModels);
-
 const scene = new Scene3D();
 
 // Global variables
-let ProgramInfo = undefined;
+let colorProgramInfo = undefined;
 let gl = undefined;
 const duration = 10; // ms
 let elapsed = 0;
 let then = 0;
-const numLights = 3
 
+// Plantilla para copiar VAO/buffers a los agentes
+let baseCube = undefined;
 
 // Main function is async to be able to make the requests
 async function main() {
@@ -77,26 +70,27 @@ async function main() {
   twgl.resizeCanvasToDisplaySize(gl.canvas);
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
-  initTextures(gl);
-
   // Prepare the program with the shaders
-  ProgramInfo = twgl.createProgramInfo(gl, [vsGLSL, fsGLSL]);
+  colorProgramInfo = twgl.createProgramInfo(gl, [vsGLSL, fsGLSL]);
 
-  // Initialize the agents model
+  // Initialize the agents model (Mesa)
   await initAgentsModel();
-  // Get the agents and obstacles
+
+  // ⚠ IMPORTANTE: avanzar al menos un step para que spawneen carros
+  await update();
+
+  // Get the agents and obstacles (por si quieres forzar uno más)
   await getAgents();
   await getObstacles();
+  await getRoads();
+  await getDestinations();
   await getTrafficLights();
-  await getRoad();
-  await getDestination();
-  await getSideWalks();
 
   // Initialize the scene
   setupScene();
 
   // Position the objects in the scene
-  setupObjects(scene, gl, ProgramInfo);
+  setupObjects(scene, gl, colorProgramInfo);
 
   // Prepare the user interface
   setupUI();
@@ -106,111 +100,166 @@ async function main() {
 }
 
 function setupScene() {
-  let camera = new Camera3D(0,
-    10,             // Distance to target
+  let camera = new Camera3D(
+    0,
+    30,             // Distance to target un poco más lejos
     4,              // Azimut
-    0.8,              // Elevation
+    0.8,            // Elevation
     [0, 0, 10],
-    [0, 0, 0]);
-  camera.panOffset = [0, 8, 0];
+    [14, 0, 14]     // Mirar más o menos al centro del grid 28x28
+  );
+  camera.panOffset = [0, 10, 0];
   scene.setCamera(camera);
   scene.camera.setupControls();
 
-    // Create global light
   let light = new Light3D(
-    [50, 4, 50],          // Position
-    [0.4, 0.4, 1.0, 1.0], // Ambient
+    [14, 20, 14],          // Position
+    [0.6, 0.6, 1.0, 1.0], // Ambient
     [0.2, 0.2, 0.2, 1.0], // Diffuse
     [0.5, 0.5, 0.5, 1.0], // Specular
   );
   scene.addLight(light);
 }
 
-function setupObjects(scene, gl, ProgramInfo) {
-   // Used for skybox and sidewalks
-  const baseCube = new Object3D(1);
-  baseCube.arrays = cubeTextured(2);
-  baseCube.bufferInfo = twgl.createBufferInfoFromArrays(gl, baseCube.arrays);
-  baseCube.vao = twgl.createVAOFromBufferInfo(gl, ProgramInfo, baseCube.bufferInfo);
+function setupObjects(scene, gl, programInfo) {
+    function createTexture(gl, src) {
+      return twgl.createTexture(gl, {
+        min: gl.LINEAR,
+        mag: gl.LINEAR,
+        src: src,
+      });
+    }
+  // Create VAO for the base cube
+  baseCube = new Object3D(-1);
+  baseCube.prepareVAO(gl, programInfo);
 
-    // Road with texture
-  const baseRoad = new Object3D(2);
-  baseRoad.prepareVAO(gl, ProgramInfo);
+  const carTexture = createTexture(gl, '../assets/textures/Cars/Tyre.png');
+  // Load car geometry
+  const carArrays = loadObj(car1Obj);
+  const carMaterials = loadMtl(car1Mtl);
 
-    // Skybox
-  let skybox = new Object3D(3);
-  skybox.arrays = baseCube.arrays;
-  skybox.bufferInfo = baseCube.bufferInfo;
-  skybox.vao = baseCube.vao;
-  skybox.scale = { x: -50, y: -100, z: -100 };
-  skybox.programType = 'texture';
-  skybox.texture = skyboxTexture;
-  scene.addObject(skybox);
-
-  const carOne = createBaseModelWithMtl(4, gl, ProgramInfo, carModels["0"].obj, carModels["0"].mtl);
-  const carModelsArray = [carOne];
-  const carTexturesArray = [carOneTexture];
-
-    for (const agent of agents) {
-    // Get random model
-    const randomIndex = Math.floor(Math.random() * carModelsArray.length); 
-    const car = carModelsArray[randomIndex];
-
-    assignModelToAgents([agent], car, {
-      scale: { x: 0.1, y: 0.1, z: 0.1 },
-      color: [1.0, 1.0, 1.0, 1.0],
-      shininess: 4.0,
-      texture: carTexturesArray[randomIndex],
-      programType: 'texture',
-    });
-
+  const carObj3D = new Object3D(-10);
+  carObj3D.arrays = carArrays;
+  carObj3D.bufferInfo = twgl.createBufferInfoFromArrays(gl, carArrays);
+  carObj3D.vao = twgl.createVAOFromBufferInfo(gl, colorProgramInfo, carObj3D.bufferInfo);
+  // Copiar propiedades a los agentes (carros)
+  for (const agent of agents) {
+    agent.arrays = carArrays;
+    agent.bufferInfo = carObj3D.bufferInfo;
+    agent.vao = carObj3D.vao;
+    agent.scale = { x: 0.5, y: 0.5, z: 0.5 }; // adjust as needed
+    agent.texture = carTexture;
+    agent.programType = 'texture';
+    agent.color = [1, 1, 1, 1];
     scene.addObject(agent);
   }
 
-  // obstacles
-  const ObstacleOne = createBaseModelWithMtl(5, gl, ProgramInfo, buildingModels["0"].obj, buildingModels["0"].mtl);
-  const ObstacleTwo = createBaseModelWithMtl(6, gl, ProgramInfo, buildingModels["1"].obj, buildingModels["1"].mtl);
-  const ObstacleThree = createBaseModelWithMtl(7, gl, ProgramInfo, buildingModels["2"].obj, buildingModels["2"].mtl);
-  const ObstacleFour = createBaseModelWithMtl(8, gl, ProgramInfo, buildingModels["3"].obj, buildingModels["3"].mtl);
-  const ObstacleFive = createBaseModelWithMtl(9, gl, ProgramInfo, buildingModels["4"].obj, buildingModels["4"].mtl);
-  const ObstacleSix = createBaseModelWithMtl(10, gl, ProgramInfo, buildingModels["5"].obj, buildingModels["5"].mtl);
 
-  const obstaclesArray = [ObstacleOne, ObstacleTwo, ObstacleThree, ObstacleFour, ObstacleFive, ObstacleSix];
-  const buildingProperties = [
-    { scale: { x: 0.5, y: 0.5, z: 0.5 }, shininess: 16.0, texture: BuildingTextureOne },
-    { scale: { x: 0.5, y: 0.5, z: 0.5 }, shininess: 16.0, texture: BuildingTextureTwo },
-    { scale: { x: 0.35, y: 0.5, z: 0.35 }, shininess: 32.0, texture: BuildingTextureThree },
-    { scale: { x: 0.35, y: 0.5, z: 0.35 }, shininess: 32.0, texture: BuildingTextureTwo },
-    { scale: { x: 0.09, y: 0.3, z: 0.05 }, shininess: 32.0, texture: BuildingTextureOne },
-    { scale: { x: 0.005, y: 0.005, z: 0.005 }, shininess: 16.0, texture: BuildingTextureThree },
-  ]
-    for (const agent of obstacles) {
-    const randomIndex = Math.floor(Math.random() * obstaclesArray.length); 
-    const baseObstacle = obstaclesArray[randomIndex];
-    const config = buildingProperties[randomIndex];
+// Obstacles
+const buildingModels = [
+  { obj: buildingOneObj,   mtl: buildingOneMtl,   tex: '../assets/textures/Building/building_albedo.png' },
+  { obj: buildingTwoObj,   mtl: buildingTwoMtl,   tex: '../assets/textures/Building/building_albedo.png' },
+  { obj: buildingThreeObj, mtl: buildingThreeMtl, tex: '../assets/textures/Building/building_albedo.png' },
+  { obj: buildingFourObj,  mtl: buildingFourMtl,  tex: '../assets/textures/Building/building_albedo.png' }
+];
 
-    assignModelToAgents([agent], baseObstacle, {
-      ...config,
-      color: [1.0, 1.0, 1.0, 1.0],
-      programType: 'texture',
-    });
+const loadedBuildings = [];
 
-    scene.addObject(agent);
+for (let i = 0; i < buildingModels.length; i++) {
+  const arrays = loadObj(buildingModels[i].obj);   // load vertex data from OBJ
+  const materials = loadMtl(buildingModels[i].mtl); // load MTL data
+  const vaoObj = new Object3D(-(100 + i));        // unique ID
+
+  // Assign OBJ arrays directly (do NOT call prepareVAO with no argument!)
+  vaoObj.arrays = arrays;
+  vaoObj.bufferInfo = twgl.createBufferInfoFromArrays(gl, vaoObj.arrays);
+  vaoObj.vao = twgl.createVAOFromBufferInfo(gl, colorProgramInfo, vaoObj.bufferInfo);
+
+  // Create texture
+  const texture = twgl.createTexture(gl, {
+    min: gl.LINEAR,
+    mag: gl.LINEAR,
+    src: buildingModels[i].tex
+  });
+
+  loadedBuildings.push({
+    arrays: arrays,
+    bufferInfo: vaoObj.bufferInfo,
+    vao: vaoObj.vao,
+    texture: texture
+  });
+}
+
+// Assign models to obstacles
+for (const obstacle of obstacles) {
+  const rand = Math.floor(Math.random() * loadedBuildings.length);
+  const chosen = loadedBuildings[rand];
+
+  obstacle.arrays = chosen.arrays;
+  obstacle.bufferInfo = chosen.bufferInfo;
+  obstacle.vao = chosen.vao;
+
+  obstacle.scale = { x: 0.5, y: 0.5, z: 0.5 };
+  obstacle.texture = chosen.texture;
+  obstacle.color = [1, 1, 1, 1];
+  obstacle.programType = 'texture';
+  obstacle.shininess = 32;
+
+  scene.addObject(obstacle);
+}
+
+  for (const road of roads) {
+    road.arrays = baseCube.arrays;
+    road.bufferInfo = baseCube.bufferInfo;
+    road.vao = baseCube.vao;
+    road.scale = { x: 0.5, y: 0.01, z: 0.5 };
+    road.color = [0.2, 0.5, 0.5, 1.0];
+    road.position.y += 0.4;
+    if (road.posArray) {
+      road.posArray[1] = road.position.y;
+    }
+    scene.addObject(road);
   }
 
-  // traffic lights
+const catArrays = loadObj(destinationObj);
+const catMaterials = loadMtl(destinationMtl);
 
-  const TrafficLight = createBaseModelWithMtl(12, gl, ProgramInfo, trafficLightModel.obj, trafficLightModel.mtl);
+const catObj3D = new Object3D(-5);
+catObj3D.arrays = catArrays;
+catObj3D.bufferInfo = twgl.createBufferInfoFromArrays(gl, catArrays);
+catObj3D.vao = twgl.createVAOFromBufferInfo(gl, colorProgramInfo, catObj3D.bufferInfo);
 
-  for (const agent of trafficLights) {
-    assignModelToAgents([agent], TrafficLight, {
-      scale: { x: 0.5, y: 0.5, z: 0.5 },
-      programType: 'texture',
-      texture: null,
-      rotRad: getTrafficLightRotation(agent.direction),
-    });
+const catTexture = createTexture(gl, '../assets/textures/Destination/fatCat.png');
 
-    scene.addObject(agent);
+for (const destination of destinations) {
+  destination.arrays = catArrays;
+  destination.bufferInfo = catObj3D.bufferInfo;
+  destination.vao = catObj3D.vao;
+  destination.scale = { x: 0.05, y: 0.3, z: 0.05 };
+  destination.texture = catTexture;
+  destination.programType = 'texture';
+  destination.shininess = 32;
+  destination.color = [1, 1, 1, 1];
+  scene.addObject(destination);
+}
+
+
+//set up obj and mtl for traffic lights
+const greenTexture = createTexture(gl, '../assets/textures/Trafficlights/green.png');
+const redTexture = createTexture(gl, '../assets/textures/Trafficlights/red.png');
+const tlMaterials = loadMtl(trafficLightsMtl);
+const tlArrays = loadObj(trafficLightsObj);
+const trafficLightObj3D = new Object3D(-1);
+trafficLightObj3D.arrays = tlArrays;
+trafficLightObj3D.prepareVAO(gl, colorProgramInfo);
+
+    for (const tl of trafficLights) {
+    tl.arrays = tlArrays;
+    tl.bufferInfo = trafficLightObj3D.bufferInfo;
+    tl.vao = trafficLightObj3D.vao;
+    tl.scale = { x: 1, y: 1, z: 1 };
+    tl.texture = null;
+    scene.addObject(tl);
   }
 
   // Create lights for each traffic light
@@ -281,9 +330,7 @@ function setupObjects(scene, gl, ProgramInfo) {
     }
 
     lightCube.position = { x: pos.x + offsetX, y: heightOffset, z: pos.z + offsetZ };
-    lightCube.scale = { x: 0.0005, y: 0.1, z: 0.0005 };
-
-    // Set texture and color based on state
+    lightCube.scale = { x: 0.05, y: 0.1, z: 0.05 };
     lightCube.shininess = 16.0;
     lightCube.programType = 'texture';
     lightCube.color = [1.0, 1.0, 1.0, 1.0]; // White so texture shows properly
@@ -303,63 +350,52 @@ function setupObjects(scene, gl, ProgramInfo) {
     scene.addObject(lightCube);
   }
 
-  // Roads
-  const Road = createBaseModelWithMtl(14, gl, ProgramInfo, roadModel.obj, roadModel.mtl);
-
-  for (const agent of road) {
-    assignModelToAgents([agent], Road, {
-      scale: { x: 0.5, y: 1, z: 0.5 },
-      programType: 'texture',
-      texture: sidewalkTexture,
-      rotRad: getRotationByDirection(agent.direction),
-    });
-
-    scene.addObject(agent);
-  }
-
-  // Sidewalks
-  for (const agent of sidewalks) {
-    assignModelToAgents([agent], baseCube, {
-      scale: { x: 0.25, y: 0.1, z: 0.25 },
-      programType: 'texture',
-      texture: sidewalkTexture,
-    });
-
-    scene.addObject(agent);
-  }
-
-  const baseDestination = createBaseModelWithMtl(16, gl, ProgramInfo, destinationModel.obj, destinationModel.mtl);
-
-  for (const agent of destination) {
-    assignModelToAgents([agent], baseDestination, {
-      scale: { x: 0.5, y: 0.8, z: 0.5 },
-      programType: 'texture',
-      texture: plant,
-    });
-
-    scene.addObject(agent);
-  }
-
 }
 
-function updateObject() {
-  // Update the objects in the scene after a step
-  
-
-  
+// Sincronizar nuevos agentes que aparezcan después del primer frame
+function syncNewAgentsInScene() {
+  for (const agent of agents) {
+    const exists = scene.objects.find(obj => obj.id === agent.id);
+    if (!exists) {
+      agent.arrays = carArrays;
+      agent.bufferInfo = carObj3D.bufferInfo;
+      agent.vao = carObj3D.vao;
+      agent.scale = { x: 0.5, y: 0.5, z: 0.5 };
+      agent.texture = carTexture;
+      agent.programType = 'texture';
+      agent.color = [1, 1, 1, 1];
+      scene.addObject(agent);
+      console.log("New car added:", agent.id);
+    }
+  }
 }
+
 
 // Draw an object with its corresponding transformations
 function drawObject(gl, programInfo, object, viewProjectionMatrix, fract) {
-  const v3_tra = object.posArray;
-  const v3_sca = object.scaArray;
+  // Asegurar oldPosArray para interpolación
+  if (!object.oldPosArray) {
+    object.oldPosArray = [...object.posArray];
+  }
 
+  // Interpolar posición entre oldPosArray y posArray
+  let v3_tra = [
+  object.oldPosArray[0] + (object.position.x - object.oldPosArray[0]) * fract,
+  object.oldPosArray[1] + (object.position.y - object.oldPosArray[1]) * fract,
+  object.oldPosArray[2] + (object.position.z - object.oldPosArray[2]) * fract,
+  ];
+
+  // Escala
+  let v3_sca = object.scaArray || [1, 1, 1];
+
+  // Create the individual transform matrices
   const scaMat = M4.scale(v3_sca);
   const rotXMat = M4.rotationX(object.rotRad.x);
   const rotYMat = M4.rotationY(object.rotRad.y);
   const rotZMat = M4.rotationZ(object.rotRad.z);
   const traMat = M4.translation(v3_tra);
 
+  // Composite matrix
   let transforms = M4.identity();
   transforms = M4.multiply(scaMat, transforms);
   transforms = M4.multiply(rotXMat, transforms);
@@ -372,50 +408,32 @@ function drawObject(gl, programInfo, object, viewProjectionMatrix, fract) {
   const wvpMat = M4.multiply(viewProjectionMatrix, transforms);
   const normalMat = M4.transpose(M4.inverse(transforms));
 
-  // Prepare light uniforms
-  const lights = scene.lights;
-const lightPositions = [];
-const diffuseLights = [];
-const specularLights = [];
+  // Model uniforms
+  let objectUniforms = {
+    u_world: transforms,
+    u_worldInverseTransform: normalMat,
+    u_worldViewProjection: wvpMat,
+    
+    u_texture: object.texture,
+    u_color: object.color || [1,1,1,1],
+    u_shininess: object.shininess,
+  };
+  twgl.setUniforms(programInfo, objectUniforms);
 
-for (const l of lights) {
-  lightPositions.push(...l.posArray);  // flatten vec3
-  diffuseLights.push(...l.diffuse);    // flatten vec4
-  specularLights.push(...l.specular);  // flatten vec4
-}
-
-
-const uniforms = {
-  u_world: transforms,
-  u_worldInverseTransform: normalMat,
-  u_worldViewProjection: wvpMat,
-  u_texture: object.texture || null,
-  u_shininess: object.shininess || 16.0,
-  u_viewWorldPosition: scene.camera.posArray,
-  u_lightWorldPosition: lightPositions,
-  u_ambientLight: [0.4, 0.4, 0.4, 1.0],
-  u_diffuseLight: diffuseLights,
-  u_specularLight: specularLights,
-  u_constant: 1.0,
-  u_linear: 0.09,
-  u_quadratic: 0.032
-};
-
-  twgl.setUniforms(programInfo, uniforms);
   gl.bindVertexArray(object.vao);
   twgl.drawBufferInfo(gl, object.bufferInfo);
 }
 
 // Function to do the actual display of the objects
 async function drawScene() {
-  const now = Date.now();
-  const deltaTime = now - then;
+  // Compute time elapsed since last frame
+  let now = Date.now();
+  let deltaTime = now - then;
   elapsed += deltaTime;
-  const fract = Math.min(1.0, elapsed / duration);
+  let fract = Math.min(1.0, elapsed / duration);
   then = now;
 
-  updateTrafficLights(trafficLights, greenTexture, redTexture);
-
+  // Clear the canvas
   gl.clearColor(0, 0, 0, 1);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
@@ -425,8 +443,12 @@ async function drawScene() {
   scene.camera.checkKeys();
   const viewProjectionMatrix = setupViewProjection(gl);
 
-  
-  // Only consider scene lights without global light
+  // Revisar si hay agentes nuevos desde el servidor
+  syncNewAgentsInScene();
+
+  // Draw the objects
+  gl.useProgram(colorProgramInfo.program);
+
   const sceneLights = scene.lights.slice(1);
 
   // Prepare light arrays for the shader
@@ -434,18 +456,16 @@ async function drawScene() {
   let diffuseLights = [];
   let specularLights = [];
 
-  // Get global light
   const globalLight = scene.lights[0];
   lightPositions.push(...globalLight.posArray);
 
-  // Add the rest of the lights to the arrays
   for (const light of sceneLights) {
     lightPositions.push(...light.posArray);
     diffuseLights.push(...light.diffuse);
     specularLights.push(...light.specular);
   }
 
-  let textureUniforms = {
+    let uniforms = {
     u_viewWorldPosition: scene.camera.posArray,
     u_lightWorldPosition: lightPositions,
  
@@ -454,34 +474,32 @@ async function drawScene() {
     u_globalSpecularLight: globalLight.specular,
     u_diffuseLight: diffuseLights,
     u_specularLight: specularLights,
-    
-    // Attenuation parameters
     u_constant: 1.0,
     u_linear: 0.15,
     u_quadratic: 0.15,
   };
 
-  gl.useProgram(ProgramInfo.program);
-    twgl.setUniforms(ProgramInfo, textureUniforms);
+  // Draw objects
+  gl.useProgram(colorProgramInfo.program);
+  twgl.setUniforms(colorProgramInfo, uniforms);
 
   for (let object of scene.objects) {
-    drawObject(gl, ProgramInfo, object, viewProjectionMatrix, fract);
+      drawObject(gl, colorProgramInfo, object, viewProjectionMatrix, fract);
   }
-
+    // Update the scene after the elapsed duration
   if (elapsed >= duration) {
     elapsed = 0;
-    await update();
+    await update();   // avanza un step en Mesa y actualiza posiciones
   }
-
   requestAnimationFrame(drawScene);
+  console.log("Lights:", scene.lights.length);
+
 }
 
 function setupViewProjection(gl) {
-  // Field of view of 60 degrees vertically, in radians
   const fov = 60 * Math.PI / 180;
   const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
 
-  // Matrices for the world view
   const projectionMatrix = M4.perspective(fov, aspect, 1, 200);
 
   const cameraPosition = scene.camera.posArray;
@@ -497,18 +515,7 @@ function setupViewProjection(gl) {
 
 // Setup a ui.
 function setupUI() {
-  /*
-  const gui = new GUI();
-
-  // Settings for the animation
-  const animFolder = gui.addFolder('Animation:');
-  animFolder.add( settings.rotationSpeed, 'x', 0, 360)
-      .decimals(2)
-  animFolder.add( settings.rotationSpeed, 'y', 0, 360)
-      .decimals(2)
-  animFolder.add( settings.rotationSpeed, 'z', 0, 360)
-      .decimals(2)
-  */
+  // GUI desactivado por ahora
 }
 
 main();

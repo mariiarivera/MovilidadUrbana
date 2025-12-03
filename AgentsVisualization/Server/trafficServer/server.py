@@ -1,5 +1,5 @@
-from randomAgents.agent import Car, ObstacleAgent
-from randomAgents.model import RandomModel
+from trafficBase.agent import *
+from trafficBase.model import CityModel
 from mesa.visualization import (
     CommandConsole,
     Slider,
@@ -11,7 +11,7 @@ from mesa.visualization.components import AgentPortrayalStyle
 
 def random_portrayal(agent):
     if agent is None:
-        return
+        return None
 
     portrayal = AgentPortrayalStyle(
         size=50,
@@ -20,19 +20,43 @@ def random_portrayal(agent):
     )
 
     if isinstance(agent, Car):
-        portrayal.update(("color", "red"))
-    elif isinstance(agent, ObstacleAgent):
-        portrayal.update(("color", "gray"))
-        portrayal.update(("marker", "s"), ("size", 125), ("zorder", 1))
-
-    if (isinstance(agent, Car)):
         portrayal.color = "blue"
-        
-    if (isinstance(agent, SideWalk)):
+        portrayal.size = 50
+        portrayal.marker = "o"
+        portrayal.zorder = 2
+
+    elif isinstance(agent, Obstacle):
+        portrayal.color = "gray"
+        portrayal.marker = "s"
+        portrayal.size = 125
+        portrayal.zorder = 1
+
+    elif isinstance(agent, Traffic_Light):
+        portrayal.color = "green" if agent.is_green else "red"
+        portrayal.size = 50
+        portrayal.marker = "o"
+        portrayal.zorder = 3
+
+    elif isinstance(agent, Road):
         portrayal.color = "white"
+        portrayal.size = 50
+        portrayal.marker = "s"
+        portrayal.zorder = 0
+
+    elif isinstance(agent, Destination):
+        portrayal.color = "yellow"
+        portrayal.size = 50
+        portrayal.marker = "D"
+        portrayal.zorder = 2
+
+    else:
+        # fallback for any other agent
+        portrayal.color = "black"
+        portrayal.size = 25
+        portrayal.marker = "o"
+        portrayal.zorder = 2
 
     return portrayal
-
 
 model_params = {
     "seed": {
@@ -41,17 +65,14 @@ model_params = {
         "label": "Random Seed",
     },
     "num_agents": Slider("Number of agents", 10, 1, 50),
-    "width": Slider("Grid width", 28, 1, 50),
-    "height": Slider("Grid height", 28, 1, 50),
 }
 
 
 # Create the model using the initial parameters from the settings
-model = RandomModel(
+model = CityModel(
     num_agents=model_params["num_agents"].value,
-    width=model_params["width"].value,
-    height=model_params["height"].value,
-    seed=model_params["seed"]["value"])
+    seed=model_params["seed"]["value"]
+)
 
 renderer = SpaceRenderer(
     model,

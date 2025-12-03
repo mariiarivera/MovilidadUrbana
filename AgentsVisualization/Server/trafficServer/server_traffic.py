@@ -103,34 +103,7 @@ def getObstacles():
         print(e)
         return jsonify({"message": "Error with obstacle positions"}), 500
 
-@app.route('/getTrafficLights', methods=['GET'])
-@cross_origin()
-def getTrafficLights():
-    global cityModel
-    try:
-        cells = cityModel.grid.all_cells.select(
-            lambda cell: any(isinstance(obj, Traffic_Light) for obj in cell.agents)
-        ).cells
-
-        agents = [
-            (cell.coordinate, agent)
-            for cell in cells
-            for agent in cell.agents
-            if isinstance(agent, Traffic_Light)
-        ]
-
-        positions = [
-            {"id": str(a.unique_id), "x": c[0], "y": 1, "z": c[1]}
-            for (c, a) in agents
-        ]
-
-        return jsonify({'positions': positions})
-
-    except Exception as e:
-        print(e)
-        return jsonify({"message": "Error with traffic light positions"}), 500
-
-@app.route('/getRoad', methods=['GET'])
+@app.route('/getRoads', methods=['GET'])
 @cross_origin()
 def getRoad():
     global cityModel
@@ -157,7 +130,7 @@ def getRoad():
         print(e)
         return jsonify({"message": "Error with road positions"}), 500
 
-@app.route('/getDestination', methods=['GET'])
+@app.route('/getDestinations', methods=['GET'])
 @cross_origin()
 def getDestination():
     global cityModel
@@ -171,6 +144,33 @@ def getDestination():
             for cell in cells
             for agent in cell.agents
             if isinstance(agent, Destination)
+        ]
+
+        positions = [
+            {"id": str(a.unique_id), "x": c[0], "y": 1, "z": c[1]}
+            for (c, a) in agents
+        ]
+
+        return jsonify({'positions': positions})
+
+    except Exception as e:
+        print(e)
+        return jsonify({"message": "Error with destination positions"}), 500
+    
+@app.route('/getTrafficLights', methods=['GET'])
+@cross_origin()
+def getTrafficLights():
+    global cityModel
+    try:
+        cells = cityModel.grid.all_cells.select(
+            lambda cell: any(isinstance(obj, Traffic_Light) for obj in cell.agents)
+        ).cells
+
+        agents = [
+            (cell.coordinate, agent)
+            for cell in cells
+            for agent in cell.agents
+            if isinstance(agent, Traffic_Light)
         ]
 
         positions = [

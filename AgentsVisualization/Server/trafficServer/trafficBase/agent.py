@@ -163,4 +163,3 @@ class SideWalk(FixedAgent):
         """
         super().__init__(model)
         self.cell = cell
-
