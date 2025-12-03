@@ -369,14 +369,6 @@ trafficLightObj3D.prepareVAO(gl, colorProgramInfo);
     } else {
       lightCube.texture = redTexture; // Red texture
     }
-
-    lightCube.arrays = baseCube.arrays;
-    lightCube.bufferInfo = baseCube.bufferInfo;
-    lightCube.vao = baseCube.vao;
-
-    // Store reference to cube in traffic light
-    tl.lightCube = lightCube;
-    scene.addObject(lightCube);
   }
 
 }
@@ -498,7 +490,7 @@ async function drawScene() {
   scene.camera.checkKeys();
   const viewProjectionMatrix = setupViewProjection(gl);
 
-   // Draw the skybox *first*
+   // Draw the skybox **first**
   gl.depthFunc(gl.LEQUAL);  // allow skybox behind everything
   gl.disable(gl.CULL_FACE); 
 
@@ -566,6 +558,8 @@ async function drawScene() {
   gl.useProgram(colorProgramInfo.program);
   twgl.setUniforms(colorProgramInfo, uniforms);
 
+  // Draw the objects
+  gl.useProgram(colorProgramInfo.program);
   for (let object of scene.objects) {
       drawObject(gl, colorProgramInfo, object, viewProjectionMatrix, fract);
   }

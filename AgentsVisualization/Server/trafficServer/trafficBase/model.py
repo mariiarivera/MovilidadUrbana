@@ -19,7 +19,7 @@ class CityModel(Model):
         super().__init__(seed=seed)
 
         # Crea un generador de números aleatorios explícitamente
-        self.random_gen = random.Random(seed)  # Usamos el `seed` para la reproducibilidad
+        self.random_gen = random.Random(seed)  # Usamos el seed para la reproducibilidad
 
         # Load the map dictionary. The dictionary maps the characters in the map file to the corresponding agent.
         dataDictionary = json.load(open("city_files/mapDictionary.json"))
@@ -44,7 +44,7 @@ class CityModel(Model):
             self.width = len(lines[0])
             self.height = len(lines)
 
-            # Crear la cuadrícula de la simulación, pasando `self.random_gen` como generador de números aleatorios
+            # Crear la cuadrícula de la simulación, pasando self.random_gen como generador de números aleatorios
             self.grid = OrthogonalMooreGrid(
                 [self.width, self.height], capacity=100, torus=False, random=self.random_gen
             )
