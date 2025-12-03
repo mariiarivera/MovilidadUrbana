@@ -34,13 +34,10 @@ import buildingTwoObj from '../assets/models/building_1.obj?raw';
 import buildingTwoMtl from '../assets/models/building_1.mtl?raw';
 import buildingThreeObj from '../assets/models/building_2.obj?raw';
 import buildingThreeMtl from '../assets/models/building_2.mtl?raw';
-import buildingFourObj from '../assets/models/Building,.obj?raw';
-import buildingFourMtl from '../assets/models/Building,.mtl?raw';
-
 
 // Cars
-import car1Obj from '../assets/models/car.obj?raw';
-import car1Mtl from '../assets/models/car.mtl?raw';
+import car1Obj from '../assets/models/car-2024-301.obj?raw';
+import car1Mtl from '../assets/models/car-2024-301.mtl?raw';
 
 // Roads
 import roadObj from '../assets/models/untitled.obj?raw';
@@ -156,11 +153,9 @@ function setupObjects(scene, gl, programInfo) {
   skybox.texture = skyboxTexture;
   scene.addObject(skybox);
 
-  const carTexture = createTexture(gl, '../assets/textures/Cars/Tyre.png');
-  // Load car geometry
-  const carArrays = loadObj(car1Obj);
+  const carTexture = createTexture(gl, '../assets/textures/Wheels/wheel.jpg');
   const carMaterials = loadMtl(car1Mtl);
-
+  const carArrays = loadObj(car1Obj);
   const carObj3D = new Object3D(-10);
   carObj3D.arrays = carArrays;
   carObj3D.bufferInfo = twgl.createBufferInfoFromArrays(gl, carArrays);
@@ -170,7 +165,7 @@ function setupObjects(scene, gl, programInfo) {
     agent.arrays = carArrays;
     agent.bufferInfo = carObj3D.bufferInfo;
     agent.vao = carObj3D.vao;
-    agent.scale = { x: 0.5, y: 2, z: 0.5 }; 
+    agent.scale = { x: 0.5, y: 0.5, z: 0.5 }; 
     agent.texture = carTexture;
     agent.programType = 'texture';
     agent.color = [1, 1, 1, 1];
@@ -183,7 +178,6 @@ const buildingModels = [
   { obj: buildingOneObj,   mtl: buildingOneMtl,   tex: '../assets/textures/Building/building_albedo.png' },
   { obj: buildingTwoObj,   mtl: buildingTwoMtl,   tex: '../assets/textures/Building/building_albedo.png' },
   { obj: buildingThreeObj, mtl: buildingThreeMtl, tex: '../assets/textures/Building/building_albedo.png' },
-  { obj: buildingFourObj,  mtl: buildingFourMtl,  tex: '../assets/textures/Building/building_albedo.png' }
 ];
 
 const loadedBuildings = [];
@@ -215,16 +209,14 @@ for (let i = 0; i < buildingModels.length; i++) {
   });
 }
 
-/*
+
 // Assign models to obstacles
 for (const obstacle of obstacles) {
   const rand = Math.floor(Math.random() * loadedBuildings.length);
   const chosen = loadedBuildings[rand];
-
   obstacle.arrays = chosen.arrays;
   obstacle.bufferInfo = chosen.bufferInfo;
   obstacle.vao = chosen.vao;
-
   obstacle.scale = { x: 0.5, y: 1, z: 0.5 };
   obstacle.texture = chosen.texture;
   obstacle.color = [1, 1, 1, 1];
@@ -245,18 +237,17 @@ roadObj3D.vao = twgl.createVAOFromBufferInfo(gl, colorProgramInfo, roadObj3D.buf
 const roadTexture = createTexture(gl, '../assets/textures/Road/render.png'); // your road texture
 
 // Assign models to roads
-for (const road of roads) {
-  road.arrays = roadArrays;
-  road.bufferInfo = roadObj3D.bufferInfo;
-  road.vao = roadObj3D.vao;
-  road.scale = { x: 1, y: 2, z: 1 }; // adjust as needed
-  road.texture = roadTexture;
-  road.color = [1, 1, 1, 1];
-  road.programType = 'texture';
-  road.rotRad = getRotationByDirection(road.direction);
-  scene.addObject(road);
-}
-*/
+// for (const road of roads) {
+//   road.arrays = roadArrays;
+//   road.bufferInfo = roadObj3D.bufferInfo;
+//   road.vao = roadObj3D.vao;
+//   road.scale = { x: 1, y: 2, z: 1 }; // adjust as needed
+//   road.texture = roadTexture;
+//   road.color = [1, 1, 1, 1];
+//   road.programType = 'texture';
+//   road.rotRad = getRotationByDirection(road.direction);
+//   scene.addObject(road);
+// }
 
 const catArrays = loadObj(destinationObj);
 const catMaterials = loadMtl(destinationMtl);
@@ -286,17 +277,19 @@ const greenTexture = createTexture(gl, '../assets/textures/Trafficlights/green.p
 const redTexture = createTexture(gl, '../assets/textures/Trafficlights/red.png');
 const tlMaterials = loadMtl(trafficLightsMtl);
 const tlArrays = loadObj(trafficLightsObj);
-const trafficLightObj3D = new Object3D(-1);
-trafficLightObj3D.arrays = tlArrays;
-trafficLightObj3D.prepareVAO(gl, colorProgramInfo);
 
-    for (const tl of trafficLights) {
+const trafficBuffer = twgl.createBufferInfoFromArrays(gl, tlArrays);
+const trafficVAO = twgl.createVAOFromBufferInfo(gl, colorProgramInfo, trafficBuffer);
+
+  for (const tl of trafficLights) {
     tl.arrays = tlArrays;
-    tl.bufferInfo = trafficLightObj3D.bufferInfo;
-    tl.vao = trafficLightObj3D.vao;
+    tl.bufferInfo = trafficBuffer;
+    tl.vao = trafficVAO;
     tl.scale = { x: 1, y: 1, z: 1 };
-    tl.texture = null;
-    tl.rotRad = getTrafficLightRotation(tl.direction);
+
+    tl.texture = null; // usa solo color
+    tl.color = [1, 1, 1, 1];
+    tl.programType = "color"; 
     scene.addObject(tl);
   }
 
@@ -435,8 +428,9 @@ if (newRot !== undefined && oldRot !== undefined) {
   // Create the individual transform matrices
   const scaMat = M4.scale(v3_sca);
   const rotXMat = M4.rotationX(object.rotRad.x);
-  const rotYMat = M4.rotationY(object.rotRad.y);
+  const rotYMat = M4.rotationY(rotY);
   const rotZMat = M4.rotationZ(object.rotRad.z);
+
   const traMat = M4.translation(v3_tra);
 
   // Composite matrix
