@@ -15,6 +15,9 @@ const agent_server_uri = "http://localhost:8585/";
 // Initialize arrays to store agents and obstacles
 const agents = [];
 const obstacles = [];
+const roads = [];
+const destinations = [];
+const trafficLights = [];
 
 // Define the data object
 const initData = {
@@ -121,6 +124,62 @@ async function getObstacles() {
     }
 }
 
+async function getRoads() {
+    try {
+        let response = await fetch(agent_server_uri + "getRoads");
+
+        if (response.ok) {
+            let result = await response.json();
+
+            for (const roadData of result.positions) {
+                const newRoad = new Object3D(roadData.id, [roadData.x, roadData.y, roadData.z]);
+                roads.push(newRoad); 
+            }
+        }
+
+    } catch (error) {
+        console.log(error);
+    }
+}
+
+async function getDestinations() {
+    try {
+        let response = await fetch(agent_server_uri + "getDestinations");
+
+        if (response.ok) {
+            let result = await response.json();
+
+            for (const dest of result.positions) {   // <- changed name
+                const newDestination = new Object3D(dest.id, [dest.x, dest.y, dest.z]);
+                destinations.push(newDestination);   // <- outer array
+            }
+        }
+
+    } catch (error) {
+        console.log(error);
+    }
+}
+
+async function getTrafficLights() {
+    try {
+        let response = await fetch(agent_server_uri + "getTrafficLights");
+
+        if (response.ok) {
+            let result = await response.json();
+
+            for (const tl of result.positions) {   // <- changed name
+                const newTrafficLight = new Object3D(tl.id, [tl.x, tl.y, tl.z]);
+                trafficLights.push(newTrafficLight); // <- outer array
+            }
+            // console.log("Obstacles:", obstacles);
+        }
+
+    } catch (error) {
+        console.log(error);
+    }
+}
+
+
 /*
  * Updates the agent positions by sending a request to the agent server.
  */
@@ -139,4 +198,4 @@ async function update() {
     }
 }
 
-export { agents, obstacles, initAgentsModel, update, getAgents, getObstacles };
+export { agents, obstacles, roads, destinations, trafficLights, initAgentsModel, update, getAgents, getObstacles, getRoads, getDestinations, getTrafficLights };

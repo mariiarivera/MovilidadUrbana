@@ -31,8 +31,8 @@ import buildingFourObj from '../assets/models/Building,.obj?raw';
 import buildingFourMtl from '../assets/models/Building,.mtl?raw';
 import buildingFiveObj from '../assets/models/Cyprys_House.obj?raw';
 import buildingFiveMtl from '../assets/models/Cyprys_House.mtl?raw';
-import buildingSixObj from '../assets/models/2.obj?raw';
-import buildingSixMtl from '../assets/models/2.mtl?raw';
+import buildingSixObj from '../assets/models/Building,.obj?raw';
+import buildingSixMtl from '../assets/models/Building,.mtl?raw';
 
 // Destination
 import destinationObj from '../assets/models/Tree.obj?raw';
@@ -43,8 +43,8 @@ import trafficLightsObj from '../assets/models/stoplight_1.obj?raw';
 import trafficLightsMtl from '../assets/models/stoplight_1.mtl?raw';
 
 // Roads
-import roadObj from '../assets/models/road.obj?raw';
-import roadMtl from '../assets/models/road.mtl?raw';
+import roadObj from '../assets/models/untitled.obj?raw';
+import roadMtl from '../assets/models/untitled.mtl?raw';
 
 // Cars
 import car1Obj from '../assets/models/car.obj?raw';
@@ -73,26 +73,27 @@ export const roadModel = { obj: roadObj, mtl: roadMtl, type: 'texture' };
 
 // Textures
 let skyboxTexture, sidewalkTexture, BuildingTextureOne, BuildingTextureTwo, BuildingTextureThree, 
-carOneTexture, greenTexture, redTexture, destinationTexture, plant;
+carOneTexture, greenTexture, redTexture, destinationTexture, plant, BuildingTextureFour;
 
 export function initTextures(gl) {
   skyboxTexture = createTexture(gl, '../assets/textures/Skyboxes/Cubemap_Sky_08-512x512.png');
-  sidewalkTexture = createTexture(gl, '../assets/models/sidewalk.png');
+  sidewalkTexture = createTexture(gl, '../assets/textures/Road/render.png');
   BuildingTextureOne = createTexture(gl, '../assets/textures/Building/building_albedo.png');
   BuildingTextureTwo = createTexture(gl, '../assets/textures/Building/building_albedo.png');
   BuildingTextureThree = createTexture(gl, '../assets/textures/Building/building_normals.png');
   destinationTexture = createTexture(gl, '../assets/textures/Destination/bishop.jpg')
   carOneTexture = createTexture(gl, '../assets/textures/Cars/Tyre.png');
   greenTexture = createTexture(gl, '../assets/textures/Trafficlights/green.png');
-  redTexture = createTexture(gl, '../assets/textures/Trafficlights/red.png');
+  redTexture = createTexture(gl, '../assets/textures/Trafficlights/red.png'); 
   plant = createTexture(gl, '../assets/textures/Destination/indoorplant_2_vl.jpg');
+  BuildingTextureFour = createTexture(gl, '../assets/textures/Building/BrickSmallBrown0155_1_S.jpg');
 }
 
 export {
   skyboxTexture, sidewalkTexture, BuildingTextureOne,
   BuildingTextureTwo, BuildingTextureThree,
   carOneTexture, greenTexture, redTexture, destinationTexture,
-  plant
+  plant, BuildingTextureFour
 };
 
 // rotations, light positions and directions
