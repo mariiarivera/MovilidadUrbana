@@ -64,13 +64,13 @@ model_params = {
         "value": 42,
         "label": "Random Seed",
     },
-    "num_agents": Slider("Number of agents", 10, 1, 50),
+    "N": Slider("Number of agents", 10, 1, 50),
 }
 
 
 # Create the model using the initial parameters from the settings
 model = CityModel(
-    num_agents=model_params["num_agents"].value,
+    N=model_params["N"].value,
     seed=model_params["seed"]["value"]
 )
 

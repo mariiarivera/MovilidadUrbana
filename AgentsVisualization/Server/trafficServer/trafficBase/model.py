@@ -1,175 +1,134 @@
 from mesa import Model
 from mesa.discrete_space import OrthogonalMooreGrid
-import numpy as np
-from .agent import *
 import json
 import random
+
+from .agent import Road, Traffic_Light, Destination, Obstacle, SideWalk, Car
+
 
 class CityModel(Model):
     """
     Creates a model based on a city map.
-
-    Args:
-        N: Number of agents in the simulation
-        seed: Random seed for the model
     """
-
     def __init__(self, N, seed=42):
-
         super().__init__(seed=seed)
 
-        # Crea un generador de números aleatorios explícitamente
-        self.random_gen = random.Random(seed)  # Usamos el seed para la reproducibilidad
-
-        # Load the map dictionary. The dictionary maps the characters in the map file to the corresponding agent.
-        dataDictionary = json.load(open("city_files/mapDictionary.json"))
-
+        self.random_gen = random.Random(seed)
         self.num_agents = N
         self.traffic_lights = []
         self.destinations = []
-        self.spawnSteps = 10  # default spawn steps, can be customized
 
-        # SuperMetricas (metrics to track simulation progress)
-        self.carCounter = 0
-        self.totCarsSpawned = 0
-        self.totCarsArrived = 0
-        self.totStepsTaken = 0
-        self.totSemaforosFound = 0
-        self.carsEnTrafico = 0
-        self.embotellamientos = 0
+        dataDictionary = json.load(open("city_files/mapDictionary.json"))
 
-        # Load the map file. The map file is a text file where each character represents an agent.
+        # Cargar mapa
         with open("city_files/2022_base.txt") as baseFile:
             lines = baseFile.readlines()
-            self.width = len(lines[0])
+            self.width = len(lines[0].strip())
             self.height = len(lines)
-
-            # Crear la cuadrícula de la simulación, pasando self.random_gen como generador de números aleatorios
             self.grid = OrthogonalMooreGrid(
-                [self.width, self.height], capacity=100, torus=False, random=self.random_gen
+                [self.width, self.height],
+                capacity=100,
+                torus=False,
+                random=self.random_gen
             )
 
-            # Goes through each character in the map file and creates the corresponding agent.
             for r, row in enumerate(lines):
-                for c, col in enumerate(row):
+                for c, col in enumerate(row.strip()):
+                    pos = (c, self.height - r - 1)
+                    cell = self.grid[pos]
 
-                    cell = self.grid[(c, self.height - r - 1)]
-
-                    if col in ["v", "^", ">", "<"]:
-                        agent = Road(self, cell, dataDictionary[col])
+                    if col in [">", "<", "v", "^"]:
+                        direction = dataDictionary[col]  # "Right", "Left", "Down", "Up"
+                        road = Road(self, cell, direction)
+                        cell.agents.append(road)
 
                     elif col in ["S", "s"]:
-                        agent = Traffic_Light(
-                            self,
-                            cell,
-                            False if col == "S" else True,
-                            int(dataDictionary[col]),
-                        )
-                        self.traffic_lights.append(agent)
+                        state = False if col == "S" else True
+                        timeToChange = dataDictionary[col]  # 15 o 7
+                        tl = Traffic_Light(self, cell, state, timeToChange)
+                        cell.agents.append(tl)
+                        self.traffic_lights.append(tl)
 
                     elif col == "#":
-                        agent = Obstacle(self, cell)
+                        obs = Obstacle(self, cell)
+                        cell.agents.append(obs)
 
                     elif col == "D":
-                        agent = Destination(self, cell)
-                        self.destinations.append(agent)
+                        dest = Destination(self, cell)
+                        cell.agents.append(dest)
+                        self.destinations.append(dest)
+
+        # Esquinas del mapa (coinciden con tu grid)
+        self.corners = [
+            (0, 0),
+            (self.width - 1, 0),
+            (0, self.height - 1),
+            (self.width - 1, self.height - 1)
+        ]
 
         self.running = True
 
-    def spawnCars(self): 
-        """Spawn a new car at a random corner of the map with a random destination"""
-        
-        corner_size = 1 
-        corners = [
-            # Top-left 
-            [(x, y) for x in range(corner_size) for y in range(self.height - corner_size, self.height)],
-            # Top-right
-            [(x, y) for x in range(self.width - corner_size, self.width) for y in range(self.height - corner_size, self.height)],
-            # Bottom-left
-            [(x, y) for x in range(corner_size) for y in range(corner_size)],
-            # Bottom-right
-            [(x, y) for x in range(self.width - corner_size, self.width) for y in range(corner_size)]
-        ]
+    # ----------------------------------------------------
+    # SPAWN CARS: se agregan vehículos cada 10 pasos
+    # ----------------------------------------------------
+    def spawnCars(self):
+        print(f"\n🚗 spawnCars en step {self.steps}")
 
-        corner_index = self.random_gen.randint(0, 3)
-        corner_coords = corners[corner_index]
+        if not self.destinations:
+            print("⚠ No hay destinos disponibles")
+            return
 
-        empty_roads = []
-        for coord in corner_coords:
-            try:
-                if coord[0] >= self.width or coord[1] >= self.height or coord[0] < 0 or coord[1] < 0:
-                    continue
-                cell = self.grid[coord]
-                has_road = any(isinstance(obj, Road) for obj in cell.agents)
-                has_car = any(isinstance(obj, Car) for obj in cell.agents)    
-                if has_road and not has_car:
-                    empty_roads.append(cell)
-            except Exception as e:
+        for corner in self.corners:
+            cell = self.grid[corner]
+
+            # Si ya hay un carro válido ahí, lo saltamos
+            if any(isinstance(a, Car) for a in cell.agents):
                 continue
 
-        if empty_roads and self.destinations:
-            spawn_cell = self.random_gen.choice(empty_roads)
-            random_destination_agent = self.random_gen.choice(self.destinations)
-            destination_cell = random_destination_agent.cell  
+            # Intentamos asignar un destino que no esté ocupado
+            valid_destinations = [dest for dest in self.destinations if not any(isinstance(a, Car) for a in dest.cell.agents)]
+            if valid_destinations:
+                chosen_dest = self.random_gen.choice(valid_destinations)
+                dest_cell = chosen_dest.cell
+            else:
+                # Si no hay destinos libres, elegimos un destino más cercano
+                dest_cell = self.get_closest_destination(corner)
+            
+            car = Car(
+                self, cell,
+                unique_id=self.random_gen.randint(10000, 99999),
+                dest=dest_cell
+            )
 
-            car = Car(self, spawn_cell, self.carCounter, dest=destination_cell)
-            self.carCounter += 1
-            self.totCarsSpawned += 1
+            # Si no encontró ruta, lo mantenemos pero lo reintentamos
+            if not car.path:
+                print(f"  ✗ Car {car.unique_id} no encontró ruta desde {corner} -> {dest_cell.coordinate}")
+                continue
 
-            # Asegúrate de que spawn_cell esté definido
-            x, y = spawn_cell.coordinate
-            self.grid[(x, y)].agents.append(car)
-
-            # REGISTRARLO para que Mesa lo use en step()
+            cell.agents.append(car)
+            # Importante: lo registramos en el modelo
             self._agents[car.unique_id] = car
+            print(f"  ✓ Car {car.unique_id} spawn en {corner} con ruta de {len(car.path)} pasos")
 
-    def get_astar_grid(self):
-        grid = np.ones((self.width, self.height), dtype=int)
+    def get_closest_destination(self, corner):
+        """Encuentra el destino más cercano a una esquina si no hay destinos libres."""
+        min_distance = float('inf')
+        closest_dest = None
+        for dest in self.destinations:
+            distance = abs(dest.cell.coordinate[0] - corner[0]) + abs(dest.cell.coordinate[1] - corner[1])
+            if distance < min_distance:
+                min_distance = distance
+                closest_dest = dest
+        return closest_dest.cell
 
-        for x in range(self.width):
-            for y in range(self.height):
-                cell = self.grid[(x, y)]
-                
-                if any(isinstance(a, Road) for a in cell.agents):
-                    grid[x, y] = 0   # walkable road
-
-                # Destinations are also walkable
-                if any(isinstance(a, Destination) for a in cell.agents):
-                    grid[x, y] = 0
-        return grid
-
-    
-    def get_direction_grid(self):
-        grid = [[None for _ in range(self.height)] for _ in range(self.width)]
-
-        for x in range(self.width):
-            for y in range(self.height):
-                cell = self.grid[(x, y)]
-                road = next((a for a in cell.agents if isinstance(a, Road)), None)
-
-                if road is not None:
-                    direction = road.direction  # "Right", "Left", "Up", "Down"
-
-                    if direction == "Right":
-                        grid[x][y] = '>'
-                    elif direction == "Left":
-                        grid[x][y] = '<'
-                    elif direction == "Up":
-                        grid[x][y] = '^'
-                    elif direction == "Down":
-                        grid[x][y] = 'v'
-
-        return grid
-
-
-
+    # ----------------------------------------------------
     def step(self):
         """Advance the model by one step."""
-        if self.steps == 0 or self.steps == 1: 
-            self.spawnCars()  # because for some reason it doesn't spawn at step 0
-        if self.steps % self.spawnSteps == 0:
+        if self.steps == 0 or self.steps == 1:
             self.spawnCars()
 
-        cars = [a for a in self.agents if isinstance(a, Car)]
-        
+        # Spawnear cada 10 pasos
+        if self.steps % 10 == 0:
+            self.spawnCars()
+
         self.agents.shuffle_do("step")

@@ -40,8 +40,8 @@ import car1Obj from '../assets/models/car-2024-301.obj?raw';
 import car1Mtl from '../assets/models/car-2024-301.mtl?raw';
 
 // Roads
-import roadObj from '../assets/models/untitled.obj?raw';
-import roadMtl from '../assets/models/untitled.mtl?raw';
+import roadObj from '../assets/models/cube_normals.obj?raw';
+// import roadMtl from '../assets/models/cube_normals.mtl?raw';
 
 // Functions and arrays for the communication with the API
 import {
@@ -153,7 +153,7 @@ function setupObjects(scene, gl, programInfo) {
   skybox.texture = skyboxTexture;
   scene.addObject(skybox);
 
-  const carTexture = createTexture(gl, '../assets/textures/Wheels/wheel.jpg');
+  const carTexture = createTexture(gl, '../assets/textures/Wheels/wheel_red.jpg');
   const carMaterials = loadMtl(car1Mtl);
   const carArrays = loadObj(car1Obj);
   const carObj3D = new Object3D(-10);
@@ -226,29 +226,26 @@ for (const obstacle of obstacles) {
   scene.addObject(obstacle);
 }
 
-// Load road geometry and materials
-const roadArrays = loadObj(roadObj);
-const roadMaterials = loadMtl(roadMtl);
+const roadArrays = loadObj(roadObj);     // cube_normals.obj
 const roadObj3D = new Object3D(-20);
 roadObj3D.arrays = roadArrays;
 roadObj3D.bufferInfo = twgl.createBufferInfoFromArrays(gl, roadArrays);
 roadObj3D.vao = twgl.createVAOFromBufferInfo(gl, colorProgramInfo, roadObj3D.bufferInfo);
 
-const roadTexture = createTexture(gl, '../assets/textures/Road/render.png'); // your road texture
+for (const road of roads) {
+  road.arrays = roadArrays;
+  road.bufferInfo = roadObj3D.bufferInfo;
+  road.vao = roadObj3D.vao;
 
-// Assign models to roads
-// for (const road of roads) {
-//   road.arrays = roadArrays;
-//   road.bufferInfo = roadObj3D.bufferInfo;
-//   road.vao = roadObj3D.vao;
-//   road.scale = { x: 1, y: 2, z: 1 }; // adjust as needed
-//   road.texture = roadTexture;
-//   road.color = [1, 1, 1, 1];
-//   road.programType = 'texture';
-//   road.rotRad = getRotationByDirection(road.direction);
-//   scene.addObject(road);
-// }
+  road.scale = { x: 1, y: 0.1, z: 1 };  // Adjust height as needed
+  road.programType = "color";           // IMPORTANT → no texture shader
+  road.texture = null;                  // No texture
+  road.color = [0.5, 0.5, 0.5, 1.0];    // Medium gray
+  road.shininess = 8;                   // Small shininess
+  road.rotRad = getRotationByDirection(road.direction);
 
+  scene.addObject(road);
+}
 const catArrays = loadObj(destinationObj);
 const catMaterials = loadMtl(destinationMtl);
 
@@ -373,7 +370,7 @@ const trafficVAO = twgl.createVAOFromBufferInfo(gl, colorProgramInfo, trafficBuf
 
 // Sincronizar nuevos agentes que aparezcan después del primer frame
 function syncNewAgentsInScene() {
-  /*
+  
   for (const agent of agents) {
     const exists = scene.objects.find(obj => obj.id === agent.id);
     if (!exists) {
@@ -388,7 +385,7 @@ function syncNewAgentsInScene() {
       console.log("New car added:", agent.id);
     }
   }
-  */
+
 }
 
 
@@ -491,7 +488,7 @@ async function drawScene() {
   scene.camera.checkKeys();
   const viewProjectionMatrix = setupViewProjection(gl);
 
-   // Draw the skybox **first**
+   // Draw the skybox *first*
   gl.depthFunc(gl.LEQUAL);  // allow skybox behind everything
   gl.disable(gl.CULL_FACE); 
 
