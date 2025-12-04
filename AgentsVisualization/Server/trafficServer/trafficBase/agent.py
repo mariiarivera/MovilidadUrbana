@@ -2,9 +2,6 @@ from mesa.discrete_space import CellAgent, FixedAgent
 import heapq
 
 
-# ============================================================
-# ROAD
-# ============================================================
 class Road(FixedAgent):
     """Road cell with allowed movement direction."""
     def __init__(self, model, cell, direction="Left"):
@@ -13,9 +10,6 @@ class Road(FixedAgent):
         self.direction = direction
 
 
-# ============================================================
-# TRAFFIC LIGHT
-# ============================================================
 class Traffic_Light(FixedAgent):
     """Traffic light."""
     def __init__(self, model, cell, state=False, timeToChange=10):
@@ -25,7 +19,6 @@ class Traffic_Light(FixedAgent):
         self.timeToChange = timeToChange
 
     def step(self):
-        """Toggle state every timeToChange steps."""
         if self.model.steps % self.timeToChange == 0:
             self.state = not self.state
 
@@ -34,9 +27,6 @@ class Traffic_Light(FixedAgent):
         return self.state
 
 
-# ============================================================
-# DESTINATION
-# ============================================================
 class Destination(FixedAgent):
     """Destination agent."""
     def __init__(self, model, cell):
@@ -44,9 +34,6 @@ class Destination(FixedAgent):
         self.cell = cell
 
 
-# ============================================================
-# OBSTACLE
-# ============================================================
 class Obstacle(FixedAgent):
     """Obstacle agent."""
     def __init__(self, model, cell):
@@ -54,10 +41,9 @@ class Obstacle(FixedAgent):
         self.cell = cell
 
 
-# ============================================================
-# CAR - FIXED FOR ONE-WAY STREETS WITH LANE CHANGES
-# ============================================================
 class Car(CellAgent):
+    """Car agent using A* pathfinding adapted from your original code."""
+    
     def __init__(self, model, cell, unique_id=None, dest=None):
         super().__init__(model)
         self.cell = cell
@@ -72,131 +58,139 @@ class Car(CellAgent):
 
     def get_neighbors(self, pos):
         """
-        Get valid neighbors following traffic rules:
-        - Follow current road direction to move
-        - Can move to Roads, Traffic Lights, AND Destinations
-        - Destinations are reachable endpoints
+        Get neighbors using MOORE neighborhood and filter by road direction.
+        Adapted from your original get_neighbors code.
         """
         x, y = pos
-        current_cell = self.model.grid[pos]
-        
-        # Find what's in current cell
-        current_road = None
-        is_destination = False
-        
-        for agent in current_cell.agents:
-            if isinstance(agent, Road):
-                current_road = agent
-            if isinstance(agent, Destination):
-                is_destination = True
-        
-        # Special case: if we're AT a destination without a road, we've arrived - no moves
-        if is_destination and not current_road:
-            return []
-        
-        # If no road at current position and not at destination, we're stuck
-        if not current_road:
-            return []
-        
-        # We have a road - follow its direction
-        direction = current_road.direction
-        moves = {
-            "Right": (1, 0),
-            "Left": (-1, 0),
-            "Up": (0, 1),
-            "Down": (0, -1)
-        }
-        
         neighbors = []
         
-        # Follow current road direction
-        if direction in moves:
-            dx, dy = moves[direction]
-            nx, ny = x + dx, y + dy
+        # Get current cell contents
+        current_cell = self.model.grid[pos]
+        current_direction = None
+        
+        # Find road direction at current position
+        for agent in current_cell.agents:
+            if isinstance(agent, Road):
+                current_direction = agent.direction
+                break
+        
+        if current_direction:
+            # Get all Moore neighbors
+            all_neighbors = []
+            for dx in [-1, 0, 1]:
+                for dy in [-1, 0, 1]:
+                    if dx == 0 and dy == 0:
+                        continue
+                    nx, ny = x + dx, y + dy
+                    if 0 <= nx < self.model.width and 0 <= ny < self.model.height:
+                        all_neighbors.append((nx, ny))
             
-            # Check bounds
-            if not (0 <= nx < self.model.width and 0 <= ny < self.model.height):
-                return neighbors
-            
-            neighbor_cell = self.model.grid[(nx, ny)]
-            
-            # Skip if obstacle - but don't return, just skip
-            if any(isinstance(a, Obstacle) for a in neighbor_cell.agents):
-                return neighbors  # No valid neighbor in this direction
-            
-            # Accept: Roads, Traffic Lights, OR Destinations
-            has_road = any(isinstance(a, Road) for a in neighbor_cell.agents)
-            has_light = any(isinstance(a, Traffic_Light) for a in neighbor_cell.agents)
-            has_dest = any(isinstance(a, Destination) for a in neighbor_cell.agents)
-            
-            if has_road or has_light or has_dest:
-                neighbors.append((nx, ny))
+            # Filter based on direction (like your original code)
+            if current_direction == 'Left':
+                neighbors = [(nx, ny) for nx, ny in all_neighbors if nx < x]
+            elif current_direction == 'Right':
+                neighbors = [(nx, ny) for nx, ny in all_neighbors if nx > x]
+            elif current_direction == 'Up':
+                neighbors = [(nx, ny) for nx, ny in all_neighbors if ny > y]
+            elif current_direction == 'Down':
+                neighbors = [(nx, ny) for nx, ny in all_neighbors if ny < y]
+            else:
+                neighbors = all_neighbors
+        else:
+            # No road - get all Moore neighbors
+            for dx in [-1, 0, 1]:
+                for dy in [-1, 0, 1]:
+                    if dx == 0 and dy == 0:
+                        continue
+                    nx, ny = x + dx, y + dy
+                    if 0 <= nx < self.model.width and 0 <= ny < self.model.height:
+                        neighbors.append((nx, ny))
         
         return neighbors
 
-    def compute_path(self):
-        """BFS pathfinding - guaranteed to find shortest path if it exists."""
-        from collections import deque
+    def is_path_clear(self, current, neighbor):
+        """
+        Check if path from current to neighbor is clear.
+        Adapted from your es_camino_despejado method.
+        """
+        neighbor_cell = self.model.grid[neighbor]
         
+        # Check for obstacles
+        for agent in neighbor_cell.agents:
+            if isinstance(agent, Obstacle):
+                return False
+        
+        # Check for wrong destinations
+        for agent in neighbor_cell.agents:
+            if isinstance(agent, Destination) and neighbor != self.dest.coordinate:
+                return False
+        
+        return True
+
+    def compute_path(self):
+        """A* search adapted from your original a_star_search."""
         start = self.cell.coordinate
         goal = self.dest.coordinate
         
-        # BFS queue: each element is a position
-        queue = deque([start])
-        came_from = {start: None}
+        open_set = []
+        heapq.heappush(open_set, (0, start))
+        came_from = {}
+        g_score = {start: 0}
+        f_score = {start: self.heuristic(start, goal)}
         
-        max_iterations = 10000  # Much higher limit
+        max_iterations = 50000
         iterations = 0
         
-        while queue and iterations < max_iterations:
+        while open_set and iterations < max_iterations:
             iterations += 1
-            current = queue.popleft()
+            current = heapq.heappop(open_set)[1]
             
-            # Goal reached
             if current == goal:
                 # Reconstruct path
                 path = []
-                while came_from[current] is not None:
+                while current in came_from:
                     path.append(current)
                     current = came_from[current]
                 path.reverse()
                 self.path = path
-                print(f"✅ Car {self.unique_id}: Found path with {len(path)} steps (explored {iterations})")
+                print(f"✅ Car {self.unique_id}: Path {len(path)} steps")
                 return
             
-            # Explore neighbors
             for neighbor in self.get_neighbors(current):
-                if neighbor not in came_from:
+                if not self.is_path_clear(current, neighbor):
+                    continue
+                
+                tentative_g = g_score[current] + 1
+                
+                if neighbor not in g_score or tentative_g < g_score[neighbor]:
                     came_from[neighbor] = current
-                    queue.append(neighbor)
+                    g_score[neighbor] = tentative_g
+                    f = tentative_g + self.heuristic(neighbor, goal)
+                    f_score[neighbor] = f
+                    heapq.heappush(open_set, (f, neighbor))
         
-        # No path found
         self.path = []
-        print(f"❌ Car {self.unique_id}: No path from {start} to {goal}")
-        print(f"   Explored {len(came_from)} cells with BFS")
 
     def step(self):
-        """Move one step along the path."""
+        """Move one step along path."""
         if not self.path:
             return
         
         next_pos = self.path[0]
         next_cell = self.model.grid[next_pos]
         
-        # Check for red traffic light
+        # Check traffic light
         for agent in next_cell.agents:
             if isinstance(agent, Traffic_Light) and not agent.is_green:
                 return
         
-        # Check for other cars
+        # Check other cars
         if any(isinstance(a, Car) for a in next_cell.agents):
             return
         
-        # Move the car
+        # Move
         if self in self.cell.agents:
             self.cell.agents.remove(self)
         next_cell.agents.append(self)
         self.cell = next_cell
-        
-        # Remove this position from path
         self.path.pop(0)
