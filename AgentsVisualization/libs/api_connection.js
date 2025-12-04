@@ -51,53 +51,75 @@ async function initAgentsModel() {
 }
 
 /*
+ * Calculate rotation based on movement direction
+ */
+function calculateRotation(oldPos, newPos) {
+    const dx = newPos[0] - oldPos[0];
+    const dz = newPos[2] - oldPos[2];
+    
+    // No movement
+    if (dx === 0 && dz === 0) return null;
+    
+    // Calculate angle in radians
+    // Right = 0, Up = -90°, Left = 180°, Down = 90°
+    if (dx > 0) return 0;                    // Moving right (positive X)
+    if (dx < 0) return Math.PI;              // Moving left (negative X)
+    if (dz > 0) return -Math.PI / 2;         // Moving up (positive Z)
+    if (dz < 0) return Math.PI / 2;          // Moving down (negative Z)
+    
+    return null;
+}
+
+/*
  * Retrieves the current positions of all agents from the agent server.
  */
 async function getAgents() {
     try {
+        // Send a GET request to the agent server to retrieve the agent positions
         let response = await fetch(agent_server_uri + "getAgents");
 
+        // Check if the response was successful
         if (response.ok) {
+            // Parse the response as JSON
             let result = await response.json();
-            const positions = result.positions || [];
 
-            // Si no hay agentes en el servidor, no hacemos nada raro
-            if (positions.length === 0) {
-                // console.log("No hay agentes en el servidor todavía");
-                return;
-            }
+            // Log the agent positions
+            //console.log("getAgents positions: ", result.positions)
 
-            // Primer frame: crear todos los Object3D
-            if (agents.length === 0) {
-                for (const agent of positions) {
+            // Check if the agents array is empty
+            if (agents.length == 0) {
+                // Create new agents and add them to the agents array
+                for (const agent of result.positions) {
                     const newAgent = new Object3D(agent.id, [agent.x, agent.y, agent.z]);
-                    // Guardar posición anterior = actual (para interpolación)
-                    newAgent.oldPosArray = [...newAgent.posArray];
+                    // Store the initial position
+                    newAgent['oldPosArray'] = newAgent.posArray;
                     agents.push(newAgent);
                 }
-                console.log("Agentes creados:", agents);
+                // Log the agents array
+                console.log("Agents:", agents);
 
             } else {
-                // Frames siguientes: actualizar o crear nuevos si aparecen
-                for (const agent of positions) {
-                    let current_agent = agents.find((object3d) => object3d.id == agent.id);
+                // Update the positions of existing agents
+                for (const agent of result.positions) {
+                    let current_agent = agents.find(o => o.id == agent.id);
 
-                    if (current_agent !== undefined) {
-                        // Actualizar posición: mover oldPosArray -> posArray
-                        current_agent.oldPosArray = [...current_agent.posArray];
-                        current_agent.position = { x: agent.x, y: agent.y, z: agent.z };
-                    } else {
-                        // Apareció un agente nuevo que antes no existía
+                    if (!current_agent) {
                         const newAgent = new Object3D(agent.id, [agent.x, agent.y, agent.z]);
-                        newAgent.oldPosArray = [...newAgent.posArray];
+                        newAgent.oldPosArray = newAgent.posArray;
                         agents.push(newAgent);
-                        console.log("Nuevo agente agregado:", newAgent.id);
+                    } else {
+                        // Regular update
+                        current_agent.oldPosArray = current_agent.posArray;
+                        //console.log("Current agent id:", current_agent.id, "oldPosArray:", current_agent.oldPosArray);
+                        current_agent.position = { x: agent.x, y: agent.y, z: agent.z };
+                        //console.log("Updated agent id:", current_agent.id, "new posArray:", current_agent.posArray);
                     }
                 }
             }
         }
 
     } catch (error) {
+        // Log any errors that occur during the request
         console.log(error);
     }
 }
@@ -133,6 +155,7 @@ async function getRoads() {
 
             for (const roadData of result.positions) {
                 const newRoad = new Object3D(roadData.id, [roadData.x, roadData.y, roadData.z]);
+                newRoad.direction = roadData.direction; // Store direction
                 roads.push(newRoad); 
             }
         }
@@ -167,11 +190,13 @@ async function getTrafficLights() {
         if (response.ok) {
             let result = await response.json();
 
-            for (const tl of result.positions) {   // <- changed name
+            for (const tl of result.positions) {
                 const newTrafficLight = new Object3D(tl.id, [tl.x, tl.y, tl.z]);
-                trafficLights.push(newTrafficLight); // <- outer array
+                newTrafficLight.state = tl.state;       // Store state (true = green, false = red)
+                newTrafficLight.direction = tl.direction; // Store direction
+                trafficLights.push(newTrafficLight);
             }
-            // console.log("Obstacles:", obstacles);
+            console.log("Traffic lights loaded:", trafficLights.length);
         }
 
     } catch (error) {
@@ -179,6 +204,28 @@ async function getTrafficLights() {
     }
 }
 
+/*
+ * Updates traffic light states by fetching latest data
+ */
+async function updateTrafficLights() {
+    try {
+        let response = await fetch(agent_server_uri + "getTrafficLights");
+
+        if (response.ok) {
+            let result = await response.json();
+
+            for (const tlData of result.positions) {
+                const existingTL = trafficLights.find(tl => tl.id == tlData.id);
+                if (existingTL) {
+                    existingTL.state = tlData.state;
+                }
+            }
+        }
+
+    } catch (error) {
+        console.log(error);
+    }
+}
 
 /*
  * Updates the agent positions by sending a request to the agent server.
@@ -190,6 +237,7 @@ async function update() {
         if (response.ok) {
             // Después de avanzar un step en Mesa, volvemos a pedir las posiciones
             await getAgents();
+            await updateTrafficLights(); // Update traffic light states
             // console.log("Updated agents");
         }
 
@@ -198,4 +246,4 @@ async function update() {
     }
 }
 
-export { agents, obstacles, roads, destinations, trafficLights, initAgentsModel, update, getAgents, getObstacles, getRoads, getDestinations, getTrafficLights };
+export { agents, obstacles, roads, destinations, trafficLights, initAgentsModel, update, getAgents, getObstacles, getRoads, getDestinations, getTrafficLights, updateTrafficLights };
