@@ -66,7 +66,7 @@ let skyboxProgramInfo = undefined;
 let carTexture;
 let greenTexture, redTexture;
 let gl = undefined;
-const duration = 100; // ms - increased for smoother animation
+const duration = 500; // ms - increased for smoother animation
 let elapsed = 0;
 let then = 0;
 

@@ -3,6 +3,10 @@ from mesa.discrete_space import OrthogonalMooreGrid
 import json
 import random
 from .agent import Road, Traffic_Light, Destination, Obstacle, Car
+from mesa.datacollection import DataCollector
+import json
+
+
 
 class CityModel(Model):
     """Creates a model based on a city map."""
@@ -74,9 +78,9 @@ class CityModel(Model):
                         cell.agents.append(dest)
                         self.destinations.append(dest)
 
-        print(f"📏 Map: {self.width}x{self.height}")
-        print(f"🎯 Destinations: {len(self.destinations)}")
-        print(f"🚦 Traffic lights: {len(self.traffic_lights)}")
+        print(f"Map: {self.width}x{self.height}")
+        print(f"Destinations: {len(self.destinations)}")
+        print(f"Traffic lights: {len(self.traffic_lights)}")
         
         self.corners = [
             (0, 0),
@@ -87,9 +91,25 @@ class CityModel(Model):
 
         self.running = True
 
+        # Set up the DataCollector to collect data for cars and cars that arrived
+        self.datacollector = DataCollector(
+            model_reporters={
+                "Cars_in_model": self.get_number_of_cars_in_model,
+                "Cars_arrived": self.get_number_of_cars_arrived
+            }
+        )
+
+    def get_number_of_cars_in_model(self):
+        """Return the number of cars in the model."""
+        return len([agent for agent in self.agents if isinstance(agent, Car)])
+
+    def get_number_of_cars_arrived(self):
+        """Return the number of cars that have arrived at their destination."""
+        return len([agent for agent in self.agents if isinstance(agent, Car) and hasattr(agent, '_should_remove')])
+
     def spawnCars(self):
         """Spawn cars at corners with reachable destinations."""
-        print(f"\n🚗 Spawning at step {self.steps}")
+        print(f"\nSpawning at step {self.steps}")
         
         if not self.destinations:
             return
@@ -117,7 +137,7 @@ class CityModel(Model):
                     cell.agents.append(car)
                     self._agents[car.unique_id] = car
                     spawned += 1
-                    print(f"   ✅ Car {car.unique_id} at {corner} → {dest.cell.coordinate}")
+                    print(f"Car {car.unique_id} at {corner} → {dest.cell.coordinate}")
                     break
         
         print(f"   Spawned: {spawned}/{len(self.corners)}")
@@ -149,4 +169,7 @@ class CityModel(Model):
                 pass  # Already removed
         
         if cars_to_remove:
-            print(f"   🧹 Cleaned up {len(cars_to_remove)} cars")
+            print(f"Cleaned up {len(cars_to_remove)} cars")
+
+        # Collect data
+        self.datacollector.collect(self)

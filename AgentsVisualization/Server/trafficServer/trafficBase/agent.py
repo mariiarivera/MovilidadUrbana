@@ -153,7 +153,7 @@ class Car(CellAgent):
                     current = came_from[current]
                 path.reverse()
                 self.path = path
-                print(f"✅ Car {self.unique_id}: Path {len(path)} steps")
+                print(f"Car {self.unique_id}: Path {len(path)} steps")
                 return
             
             for neighbor in self.get_neighbors(current):
@@ -173,18 +173,10 @@ class Car(CellAgent):
 
     def step(self):
         """Move one step along path."""
-        # Check if already marked for removal (arrived in previous step)
-        if hasattr(self, '_should_remove'):
-            return
-            
         # Check if already at destination
         if self.cell.coordinate == self.dest.coordinate:
-            print(f"   🎯 Car {self.unique_id} arrived at {self.dest.coordinate}!")
-            # Remove from cell
-            if self in self.cell.agents:
-                self.cell.agents.remove(self)
-            # Mark for removal (will be cleaned up in model.step)
-            self._should_remove = True
+            print(f"Car {self.unique_id} arrived at {self.dest.coordinate}!")
+            self._should_remove = True  # Mark for removal when the car has reached its destination
             return
         
         if not self.path:
