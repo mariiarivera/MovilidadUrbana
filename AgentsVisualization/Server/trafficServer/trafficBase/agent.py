@@ -173,17 +173,18 @@ class Car(CellAgent):
 
     def step(self):
         """Move one step along path."""
+        # Check if already marked for removal (arrived in previous step)
+        if hasattr(self, '_should_remove'):
+            return
+            
         # Check if already at destination
         if self.cell.coordinate == self.dest.coordinate:
-            # Mark for removal - don't process further
-            if not hasattr(self, '_marked_for_removal'):
-                self._marked_for_removal = True
-                print(f"   🎯 Car {self.unique_id} arrived at {self.dest.coordinate}!")
-                # Remove from cell
-                if self in self.cell.agents:
-                    self.cell.agents.remove(self)
-                # Mark as inactive so it won't step again
-                self.model._agents.pop(self.unique_id, None)
+            print(f"   🎯 Car {self.unique_id} arrived at {self.dest.coordinate}!")
+            # Remove from cell
+            if self in self.cell.agents:
+                self.cell.agents.remove(self)
+            # Mark for removal (will be cleaned up in model.step)
+            self._should_remove = True
             return
         
         if not self.path:

@@ -130,12 +130,23 @@ class CityModel(Model):
         # Update all agents
         self.agents.shuffle_do("step")
         
-        # Clean up cars that have been marked for removal
-        # This prevents them from being in the visualization
-        cars_to_remove = []
-        for agent_id, agent in list(self._agents.items()):
-            if isinstance(agent, Car) and hasattr(agent, '_marked_for_removal'):
-                cars_to_remove.append(agent_id)
+        # Clean up cars marked for removal AFTER shuffle_do completes
+        cars_to_remove = [agent for agent in list(self.agents) 
+                         if isinstance(agent, Car) and hasattr(agent, '_should_remove')]
         
-        for agent_id in cars_to_remove:
-            del self._agents[agent_id]
+        for car in cars_to_remove:
+            # Double-check car is removed from grid cell
+            if car.cell and car in car.cell.agents:
+                car.cell.agents.remove(car)
+            
+            # Remove from _agents dict
+            self._agents.pop(car.unique_id, None)
+            
+            # Remove from agents AgentSet
+            try:
+                self.agents.remove(car)
+            except:
+                pass  # Already removed
+        
+        if cars_to_remove:
+            print(f"   🧹 Cleaned up {len(cars_to_remove)} cars")
