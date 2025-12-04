@@ -13,7 +13,8 @@ from trafficBase.agent import Car, Traffic_Light, Destination, Obstacle, Road
 number_agents = 10
 width = 28
 height = 28
-
+previous_agent_ids = set()  # Track previous agent IDs to detect removals
+previous_ambulance_ids = set()  # Track previous ambulance IDs to detect removals
 # IMPORTANT: instance variable, not the class itself
 cityModel = None
 currentStep = 0
@@ -120,7 +121,7 @@ def getRoad():
         ]
 
         positions = [
-            {"id": str(a.unique_id), "x": c[0], "y": 1, "z": c[1]}
+            {"id": str(a.unique_id), "x": c[0], "y": 1, "z": c[1], "direction": a.direction}
             for (c, a) in agents
         ]
 
@@ -173,16 +174,27 @@ def getTrafficLights():
             if isinstance(agent, Traffic_Light)
         ]
 
-        positions = [
-            {"id": str(a.unique_id), "x": c[0], "y": 1, "z": c[1]}
-            for (c, a) in agents
-        ]
+        # Find road direction for each traffic light
+        positions = []
+        for (c, tl) in agents:
+            # Get the road at this position
+            road = next((a for a in tl.cell.agents if isinstance(a, Road)), None)
+            direction = road.direction if road else "Right"
+            
+            positions.append({
+                "id": str(tl.unique_id), 
+                "x": c[0], 
+                "y": 1, 
+                "z": c[1],
+                "state": tl.state,  
+                "direction": direction  
+            })
 
         return jsonify({'positions': positions})
 
     except Exception as e:
         print(e)
-        return jsonify({"message": "Error with destination positions"}), 500
+        return jsonify({"message": "Error with traffic light positions"}), 500
 
 @app.route('/update', methods=['GET'])
 @cross_origin()
