@@ -127,16 +127,15 @@ class CityModel(Model):
         if self.steps % 10 == 0:
             self.spawnCars()
         
+        # Update all agents
         self.agents.shuffle_do("step")
         
-        to_remove = []
-        for agent in list(self._agents.values()):
-            if isinstance(agent, Car):
-                if agent.cell.coordinate == agent.dest.coordinate:
-                    to_remove.append(agent)
+        # Clean up cars that have been marked for removal
+        # This prevents them from being in the visualization
+        cars_to_remove = []
+        for agent_id, agent in list(self._agents.items()):
+            if isinstance(agent, Car) and hasattr(agent, '_marked_for_removal'):
+                cars_to_remove.append(agent_id)
         
-        for car in to_remove:
-            self._agents.pop(car.unique_id)
-            if car in car.cell.agents:
-                car.cell.agents.remove(car)
-            print(f"   🎯 Car {car.unique_id} arrived!")
+        for agent_id in cars_to_remove:
+            del self._agents[agent_id]
