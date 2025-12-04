@@ -6,7 +6,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
 from trafficBase.model import CityModel
 
-from trafficBase.agent import Car, Agent, Traffic_Light, Destination, Obstacle, Road, SideWalk
+from trafficBase.agent import Car, Traffic_Light, Destination, Obstacle, Road
 
 
 # Simulation parameters
@@ -183,33 +183,6 @@ def getTrafficLights():
     except Exception as e:
         print(e)
         return jsonify({"message": "Error with destination positions"}), 500
-    
-@app.route('/getSideWalks', methods=['GET'])
-@cross_origin()
-def getSideWalks():
-    global cityModel
-    try:
-        cells = cityModel.grid.all_cells.select(
-            lambda cell: any(isinstance(obj, SideWalk) for obj in cell.agents)
-        ).cells
-
-        agents = [
-            (cell.coordinate, agent)
-            for cell in cells
-            for agent in cell.agents
-            if isinstance(agent, SideWalk)
-        ]
-
-        positions = [
-            {"id": str(a.unique_id), "x": c[0], "y": 1, "z": c[1]}
-            for (c, a) in agents
-        ]
-
-        return jsonify({'positions': positions})
-
-    except Exception as e:
-        print(e)
-        return jsonify({"message": "Error with road positions"}), 500
 
 @app.route('/update', methods=['GET'])
 @cross_origin()
