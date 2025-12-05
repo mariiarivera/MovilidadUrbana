@@ -1,3 +1,5 @@
+#Agent.py
+
 from mesa.discrete_space import CellAgent, FixedAgent
 import heapq
 
@@ -48,7 +50,7 @@ class Car(CellAgent):
         super().__init__(model)
         self.cell = cell
         self.unique_id = unique_id
-        self.dest = dest
+        self.dest = dest  # This is the Destination agent
         self.path = []
         self.compute_path()
 
@@ -57,25 +59,19 @@ class Car(CellAgent):
         return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
     def get_neighbors(self, pos):
-        """
-        Get neighbors using MOORE neighborhood and filter by road direction.
-        Adapted from your original get_neighbors code.
-        """
+        """Get neighbors using MOORE neighborhood and filter by road direction."""
         x, y = pos
         neighbors = []
         
-        # Get current cell contents
         current_cell = self.model.grid[pos]
         current_direction = None
         
-        # Find road direction at current position
         for agent in current_cell.agents:
             if isinstance(agent, Road):
                 current_direction = agent.direction
                 break
         
         if current_direction:
-            # Get all Moore neighbors
             all_neighbors = []
             for dx in [-1, 0, 1]:
                 for dy in [-1, 0, 1]:
@@ -85,7 +81,6 @@ class Car(CellAgent):
                     if 0 <= nx < self.model.width and 0 <= ny < self.model.height:
                         all_neighbors.append((nx, ny))
             
-            # Filter based on direction (like your original code)
             if current_direction == 'Left':
                 neighbors = [(nx, ny) for nx, ny in all_neighbors if nx < x]
             elif current_direction == 'Right':
@@ -97,7 +92,6 @@ class Car(CellAgent):
             else:
                 neighbors = all_neighbors
         else:
-            # No road - get all Moore neighbors
             for dx in [-1, 0, 1]:
                 for dy in [-1, 0, 1]:
                     if dx == 0 and dy == 0:
@@ -109,20 +103,17 @@ class Car(CellAgent):
         return neighbors
 
     def is_path_clear(self, current, neighbor):
-        """
-        Check if path from current to neighbor is clear.
-        Adapted from your es_camino_despejado method.
-        """
+        """Check if path from current to neighbor is clear."""
         neighbor_cell = self.model.grid[neighbor]
         
-        # Check for obstacles
         for agent in neighbor_cell.agents:
             if isinstance(agent, Obstacle):
                 return False
         
-        # Check for wrong destinations
+        # FIX: Check if destination cell matches goal
+        goal_coord = self.dest.cell.coordinate
         for agent in neighbor_cell.agents:
-            if isinstance(agent, Destination) and neighbor != self.dest.coordinate:
+            if isinstance(agent, Destination) and neighbor != goal_coord:
                 return False
         
         return True
@@ -130,7 +121,7 @@ class Car(CellAgent):
     def compute_path(self):
         """A* search adapted from your original a_star_search."""
         start = self.cell.coordinate
-        goal = self.dest.coordinate
+        goal = self.dest.cell.coordinate  # FIX: Access coordinate correctly
         
         open_set = []
         heapq.heappush(open_set, (0, start))
@@ -146,14 +137,12 @@ class Car(CellAgent):
             current = heapq.heappop(open_set)[1]
             
             if current == goal:
-                # Reconstruct path
                 path = []
                 while current in came_from:
                     path.append(current)
                     current = came_from[current]
                 path.reverse()
                 self.path = path
-                print(f"Car {self.unique_id}: Path {len(path)} steps")
                 return
             
             for neighbor in self.get_neighbors(current):
@@ -173,10 +162,14 @@ class Car(CellAgent):
 
     def step(self):
         """Move one step along path."""
-        # Check if already at destination
-        if self.cell.coordinate == self.dest.coordinate:
-            print(f"Car {self.unique_id} arrived at {self.dest.coordinate}!")
-            self._should_remove = True  # Mark for removal when the car has reached its destination
+        if hasattr(self, '_should_remove'):
+            return
+            
+        # FIX: Check destination correctly
+        if self.cell.coordinate == self.dest.cell.coordinate:
+            if self in self.cell.agents:
+                self.cell.agents.remove(self)
+            self._should_remove = True
             return
         
         if not self.path:

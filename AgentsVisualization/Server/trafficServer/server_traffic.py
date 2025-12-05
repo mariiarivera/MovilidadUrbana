@@ -1,3 +1,5 @@
+#Server_traffic.py
+
 # TC2008B. Sistemas Multiagentes y Gráficas Computacionales
 # Python flask server to interact with WebGL.
 # Octavio Navarro. 2024
@@ -211,6 +213,6 @@ def updateModel():
         print(e)
         return jsonify({"message": "Error during model update"}), 500
 
-    
+
 if __name__ == '__main__':
     app.run(host="localhost", port=8585, debug=True)

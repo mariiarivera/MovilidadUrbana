@@ -1,12 +1,10 @@
+#Model.py 
+
 from mesa import Model
 from mesa.discrete_space import OrthogonalMooreGrid
 import json
 import random
 from .agent import Road, Traffic_Light, Destination, Obstacle, Car
-from mesa.datacollection import DataCollector
-import json
-
-
 
 class CityModel(Model):
     """Creates a model based on a city map."""
@@ -19,10 +17,11 @@ class CityModel(Model):
         self.traffic_lights = []
         self.destinations = []
         self.car_counter = 0
+        self.total_spawned = 0  # Track total cars spawned
 
         dataDictionary = json.load(open("city_files/mapDictionary.json"))
 
-        with open("city_files/2022_base.txt") as baseFile:
+        with open("city_files/2025_base.txt") as baseFile:
             lines = baseFile.readlines()
             self.width = len(lines[0].strip())
             self.height = len(lines)
@@ -34,7 +33,7 @@ class CityModel(Model):
                 random=self.random_gen
             )
 
-            # Parse map - single pass, create roads for traffic lights
+            # Parse map
             for r, row in enumerate(lines):
                 row_str = row.strip()
                 for c, col in enumerate(row_str):
@@ -47,7 +46,6 @@ class CityModel(Model):
                         cell.agents.append(road)
 
                     elif col in ["S", "s"]:
-                        # Infer direction
                         direction = "Right"
                         if c > 0 and row_str[c-1] in ['>', 's', 'S']:
                             direction = "Right"
@@ -58,11 +56,9 @@ class CityModel(Model):
                         elif r < len(lines) - 1 and c < len(lines[r+1].strip()) and lines[r+1].strip()[c] == '^':
                             direction = "Up"
                         
-                        # Create road
                         road = Road(self, cell, direction)
                         cell.agents.append(road)
                         
-                        # Create traffic light
                         state = False if col == "S" else True
                         timeToChange = dataDictionary[col]
                         tl = Traffic_Light(self, cell, state, timeToChange)
@@ -78,9 +74,6 @@ class CityModel(Model):
                         cell.agents.append(dest)
                         self.destinations.append(dest)
 
-        print(f"Map: {self.width}x{self.height}")
-        print(f"Destinations: {len(self.destinations)}")
-        print(f"Traffic lights: {len(self.traffic_lights)}")
         
         self.corners = [
             (0, 0),
@@ -89,34 +82,24 @@ class CityModel(Model):
             (self.width - 1, self.height - 1)
         ]
 
+        # FIX: Spawn initial cars immediately
+        self.spawnCars()
+        
         self.running = True
-
-        # Set up the DataCollector to collect data for cars and cars that arrived
-        self.datacollector = DataCollector(
-            model_reporters={
-                "Cars_in_model": self.get_number_of_cars_in_model,
-                "Cars_arrived": self.get_number_of_cars_arrived
-            }
-        )
-
-    def get_number_of_cars_in_model(self):
-        """Return the number of cars in the model."""
-        return len([agent for agent in self.agents if isinstance(agent, Car)])
-
-    def get_number_of_cars_arrived(self):
-        """Return the number of cars that have arrived at their destination."""
-        return len([agent for agent in self.agents if isinstance(agent, Car) and hasattr(agent, '_should_remove')])
 
     def spawnCars(self):
         """Spawn cars at corners with reachable destinations."""
-        print(f"\nSpawning at step {self.steps}")
+        # FIX: Reduce console spam
         
         if not self.destinations:
             return
         
         spawned = 0
         
-        for corner in self.corners:
+        available_corners = self.corners.copy()
+        self.random_gen.shuffle(available_corners)
+        
+        for corner in available_corners:
             cell = self.grid[corner]
             
             if any(isinstance(a, Car) for a in cell.agents):
@@ -125,51 +108,29 @@ class CityModel(Model):
             if not any(isinstance(a, Road) for a in cell.agents):
                 continue
             
-            # Try all destinations shuffled
             shuffled = self.destinations.copy()
             self.random_gen.shuffle(shuffled)
             
             for dest in shuffled:
                 self.car_counter += 1
-                car = Car(self, cell, unique_id=self.car_counter, dest=dest.cell)
+                car = Car(self, cell, unique_id=self.car_counter, dest=dest)
                 
                 if car.path:
                     cell.agents.append(car)
-                    self._agents[car.unique_id] = car
+                    self.agents.add(car)
                     spawned += 1
-                    print(f"Car {car.unique_id} at {corner} → {dest.cell.coordinate}")
+                    self.total_spawned += 1
                     break
         
-        print(f"   Spawned: {spawned}/{len(self.corners)}")
-
     def step(self):
         """Advance model by one step."""
-        if self.steps % 10 == 0:
-            self.spawnCars()
-        
-        # Update all agents
+        self.spawnCars()
         self.agents.shuffle_do("step")
         
-        # Clean up cars marked for removal AFTER shuffle_do completes
         cars_to_remove = [agent for agent in list(self.agents) 
                          if isinstance(agent, Car) and hasattr(agent, '_should_remove')]
         
         for car in cars_to_remove:
-            # Double-check car is removed from grid cell
             if car.cell and car in car.cell.agents:
                 car.cell.agents.remove(car)
-            
-            # Remove from _agents dict
-            self._agents.pop(car.unique_id, None)
-            
-            # Remove from agents AgentSet
-            try:
-                self.agents.remove(car)
-            except:
-                pass  # Already removed
-        
-        if cars_to_remove:
-            print(f"Cleaned up {len(cars_to_remove)} cars")
-
-        # Collect data
-        self.datacollector.collect(self)
+            self.agents.remove(car)
