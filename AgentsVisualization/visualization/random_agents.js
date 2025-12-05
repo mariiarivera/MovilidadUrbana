@@ -1,5 +1,3 @@
-//random_agents.js
-
 /* 
  * Base program for a 3D scene that connects to an API to get the movement
  * of agents.
@@ -81,6 +79,25 @@ let carVAO = undefined;
 // Store light cubes for traffic lights
 const trafficLightCubes = [];
 
+// Car color palette - vibrant, varied colors
+const carColors = [
+  [0.9, 0.1, 0.1, 1.0],  // Red
+  [0.1, 0.3, 0.9, 1.0],  // Blue
+  [0.1, 0.8, 0.2, 1.0],  // Green
+  [0.95, 0.8, 0.1, 1.0], // Yellow
+  [0.9, 0.4, 0.1, 1.0],  // Orange
+  [0.6, 0.1, 0.8, 1.0],  // Purple
+  [0.1, 0.8, 0.8, 1.0],  // Cyan
+  [0.9, 0.1, 0.5, 1.0],  // Pink
+  [0.2, 0.2, 0.2, 1.0],  // Dark Gray
+  [0.9, 0.9, 0.9, 1.0],  // White
+  [0.5, 0.3, 0.1, 1.0],  // Brown
+  [0.3, 0.6, 0.3, 1.0],  // Forest Green
+  [0.8, 0.0, 0.0, 1.0],  // Dark Red
+  [0.0, 0.2, 0.6, 1.0],  // Navy Blue
+  [0.7, 0.5, 0.0, 1.0],  // Gold
+];
+
 // Helpers
 function lerp(a, b, t) {
   return a + (b - a) * t;
@@ -90,9 +107,10 @@ function clamp(x, min, max) {
   return Math.max(min, Math.min(max, x));
 }
 
-// =======================================================
-// MAIN
-// =======================================================
+function getRandomCarColor() {
+  return carColors[Math.floor(Math.random() * carColors.length)];
+}
+
 async function main() {
   const canvas = document.querySelector('canvas');
   gl = canvas.getContext('webgl2');
@@ -126,9 +144,6 @@ async function main() {
   drawScene();
 }
 
-// =======================================================
-// CAMERA + LIGHT
-// =======================================================
 function setupScene() {
   let camera = new Camera3D(
     0,
@@ -142,18 +157,16 @@ function setupScene() {
   scene.setCamera(camera);
   scene.camera.setupControls();
 
+  // Brighter sun-like light for daytime look
   let light = new Light3D(
-    [14, 40, 14],                // Posición alta, efecto de luna
-    [0.9, 0.9, 0.9, 1.0],        // Ambient
-    [0.9, 0.9, 1.0, 1.0],        // Difusa
-    [1.0, 1.0, 1.0, 1.0]         // Especular
+    [14, 40, 14],                // High position, sun-like
+    [0.3, 0.3, 0.3, 1.0],        // Ambient - brighter
+    [1.0, 0.98, 0.9, 1.0],       // Diffuse - warm sunlight
+    [1.0, 1.0, 1.0, 1.0]         // Specular
   );
   scene.addLight(light);
 }
 
-// =======================================================
-// SETUP OBJECTS
-// =======================================================
 async function setupObjects(scene, gl, programInfo) {
 
   function createTexture(src) {
@@ -176,9 +189,10 @@ async function setupObjects(scene, gl, programInfo) {
   baseCubeTex.vao = twgl.createVAOFromBufferInfo(gl, skyboxProgramInfo, baseCubeTex.bufferInfo);
 
   baseCubeTex.position = { x: 14, y: 0, z: 14 };
-  baseCubeTex.scale = { x: -80, y: -80, z: -80 };
+  baseCubeTex.scale = { x: 80, y: 80, z: 80 }; // Positive scale, we'll handle inside with disable culling
   baseCubeTex.programType = 'skybox';
   baseCubeTex.texture = skyTexture;
+  baseCubeTex.color = [1.0, 1.0, 1.0, 1.0]; // White color to not tint
   baseCubeTex.isSkybox = true;
   baseCubeTex.isCar = false;
   scene.addObject(baseCubeTex);
@@ -201,9 +215,6 @@ async function setupObjects(scene, gl, programInfo) {
   carBufferInfo = carObj3D.bufferInfo;
   carVAO = carObj3D.vao;
 
-  // ==============================
-  // CARS — ÚNICOS QUE INTERPOLAN
-  // ==============================
   for (const agent of agents) {
     agent.arrays = carArrays;
     agent.bufferInfo = carBufferInfo;
@@ -211,7 +222,9 @@ async function setupObjects(scene, gl, programInfo) {
     agent.scale = { x: 0.5, y: 0.5, z: 0.5 }; 
     agent.texture = carTexture;
     agent.programType = 'texture';
-    agent.color = [1.0, 1.0, 1.0, 1.0];
+    
+    // Random color for each car
+    agent.color = getRandomCarColor();
     agent.shininess = 32;
 
     // Interpolación de posición
@@ -229,12 +242,9 @@ async function setupObjects(scene, gl, programInfo) {
     agent.isCar = true;
 
     scene.addObject(agent);
-    console.log("Initial car added:", agent.id);
+    console.log("Initial car added:", agent.id, "with color:", agent.color);
   }
 
-  // ==============================
-  // OBSTÁCULOS (EDIFICIOS) — ESTÁTICOS
-  // ==============================
   const buildingModels = [
     { obj: buildingOneObj,   mtl: buildingOneMtl,   tex: '../assets/textures/Building/building_albedo.png' },
     { obj: buildingTwoObj,   mtl: buildingTwoMtl,   tex: '../assets/textures/Building/building_albedo.png' },
@@ -266,6 +276,20 @@ async function setupObjects(scene, gl, programInfo) {
     });
   }
 
+  // Traditional building colors palette
+  const buildingColors = [
+    [0.85, 0.75, 0.65, 1.0], // Beige/Tan
+    [0.75, 0.70, 0.65, 1.0], // Light Brown
+    [0.65, 0.60, 0.55, 1.0], // Gray-Brown
+    [0.80, 0.80, 0.75, 1.0], // Off-White
+    [0.70, 0.65, 0.60, 1.0], // Warm Gray
+    [0.60, 0.55, 0.50, 1.0], // Medium Gray
+    [0.75, 0.65, 0.55, 1.0], // Terracotta
+    [0.85, 0.80, 0.70, 1.0], // Cream
+    [0.55, 0.50, 0.45, 1.0], // Dark Gray
+    [0.70, 0.60, 0.50, 1.0], // Brown
+  ];
+
   for (const obstacle of obstacles) {
     const rand = Math.floor(Math.random() * loadedBuildings.length);
     const chosen = loadedBuildings[rand];
@@ -274,19 +298,16 @@ async function setupObjects(scene, gl, programInfo) {
     obstacle.bufferInfo = chosen.bufferInfo;
     obstacle.vao = chosen.vao;
 
+    // Keep the building texture
     obstacle.texture = chosen.texture;
     obstacle.programType = 'texture';
     obstacle.shininess = 32;
 
-    const height = 0.5 + Math.random() * 1;
+    const height = 0.5 + Math.random() * 0.5;
     obstacle.scale = { x: 0.5, y: height, z: 0.5 };
 
-    obstacle.color = [
-      0.5 + Math.random() * 0.5,
-      0.5 + Math.random() * 0.5,
-      0.5 + Math.random() * 0.5,
-      1.0
-    ];
+    // Assign random traditional building color - this will tint the texture
+    obstacle.color = buildingColors[Math.floor(Math.random() * buildingColors.length)];
 
     obstacle.isCar = false;
     obstacle.oldPos = null;
@@ -295,9 +316,6 @@ async function setupObjects(scene, gl, programInfo) {
     scene.addObject(obstacle);
   }
 
-  // ==============================
-  // ROADS — ESTÁTICOS
-  // ==============================
   const roadArrays = loadObj(roadObj);
   const roadObj3D = new Object3D(-20);
   roadObj3D.arrays = roadArrays;
@@ -323,9 +341,6 @@ async function setupObjects(scene, gl, programInfo) {
     scene.addObject(road);
   }
 
-  // ==============================
-  // DESTINOS — ESTÁTICOS
-  // ==============================
   const catArrays = loadObj(destinationObj);
   const catMaterials = loadMtl(destinationMtl);
 
@@ -353,9 +368,6 @@ async function setupObjects(scene, gl, programInfo) {
     scene.addObject(destination);
   }
 
-  // ==============================
-  // TRAFFIC LIGHTS — ESTÁTICOS
-  // ==============================
   const tlMaterials = loadMtl(trafficLightsMtl);
   const tlArrays = loadObj(trafficLightsObj);
 
@@ -383,7 +395,7 @@ async function setupObjects(scene, gl, programInfo) {
   // Luces físicas para cada semáforo
   for (const tl of trafficLights) {
     const pos = tl.position;
-    const heightOffset = pos.y + 1;
+    const heightOffset = pos.y + 0.5;
 
     let offsetX = 0;
     let offsetZ = 0;
@@ -418,7 +430,7 @@ async function setupObjects(scene, gl, programInfo) {
   for (const tl of trafficLights) {
     const lightCube = new Object3D(1000 + parseInt(tl.id));
     const pos = tl.position;
-    const heightOffset = pos.y + 0.3;
+    const heightOffset = pos.y + 1;
 
     let offsetX = 0;
     let offsetZ = 0;
@@ -497,7 +509,7 @@ function syncNewAgentsInScene() {
       continue;
     }
 
-    // Carro nuevo
+    // Carro nuevo - assign random color
     agent.arrays = carArrays;
     agent.bufferInfo = carBufferInfo;
     agent.vao = carVAO;
@@ -514,12 +526,13 @@ function syncNewAgentsInScene() {
     agent.newPos = [...p];
     agent.interpolateStart = Date.now();
 
-    agent.color = [1.0, 1.0, 1.0, 1.0];
+    // Random color for new car
+    agent.color = getRandomCarColor();
     agent.shininess = 32;
     agent.isCar = true;
 
     scene.addObject(agent);
-    console.log("New car added to scene:", agent.id);
+    console.log("New car added to scene:", agent.id, "with color:", agent.color);
   }
   
   // Quitar carros que ya no existen en el modelo de Mesa
@@ -537,34 +550,33 @@ function syncNewAgentsInScene() {
   }
 }
 
-// =======================================================
-// UPDATE VISUAL DE SEMÁFOROS
-// =======================================================
+
 function updateTrafficLightVisuals() {
+  // Update traffic light visuals based on current state from API
   for (const lightCube of trafficLightCubes) {
-    const tl = trafficLights.find(t => t.id === lightCube.trafficLightId);
-    if (tl) {
-      if (tl.state) {
+    const tlData = trafficLights.find(t => t.id === lightCube.trafficLightId);
+    if (tlData) {
+      // Update cube texture
+      if (tlData.state) {
         lightCube.texture = greenTexture;
       } else {
         lightCube.texture = redTexture;
       }
 
-      if (tl.light) {
-        const lightColor = tl.state
+      // Find the traffic light object in scene to update its light
+      const tlObject = scene.objects.find(obj => obj.id === tlData.id && !obj.isCar);
+      if (tlObject && tlObject.light) {
+        const lightColor = tlData.state
           ? [0.0, 0.8, 0.0, 1.0]
           : [0.8, 0.0, 0.0, 1.0];
         
-        tl.light.diffuse = lightColor;
-        tl.light.specular = lightColor;
+        tlObject.light.diffuse = lightColor;
+        tlObject.light.specular = lightColor;
       }
     }
   }
 }
 
-// =======================================================
-// DRAW OBJECT (SUAVIZADO PRO SOLO PARA CARROS)
-// =======================================================
 function drawObject(gl, programInfo, object, viewProjectionMatrix, fract) {
 
   // Parámetros de interpolación
@@ -646,9 +658,6 @@ function drawObject(gl, programInfo, object, viewProjectionMatrix, fract) {
   twgl.drawBufferInfo(gl, object.bufferInfo);
 }
 
-// =======================================================
-// DRAW SCENE
-// =======================================================
 async function drawScene() {
   let now = Date.now();
   let deltaTime = now - then;
@@ -656,7 +665,8 @@ async function drawScene() {
   let fract = Math.min(1.0, elapsed / duration);
   then = now;
 
-  gl.clearColor(0.1, 0.1, 0.15, 1);
+  // Sky blue background instead of black
+  gl.clearColor(0.53, 0.81, 0.92, 1); // Light sky blue
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
   gl.enable(gl.CULL_FACE);
@@ -707,19 +717,7 @@ async function drawScene() {
     u_quadratic: 0.032,
   };
 
-  // Skybox primero
-  const skyboxObjects = scene.objects.filter(obj => obj.isSkybox);
-  if (skyboxObjects.length > 0) {
-    gl.useProgram(skyboxProgramInfo.program);
-    gl.disable(gl.CULL_FACE);
-    gl.depthFunc(gl.LEQUAL);
-    
-    for (let skybox of skyboxObjects) {
-      drawObject(gl, skyboxProgramInfo, skybox, viewProjectionMatrix, 1.0);
-    }
-  }
-
-  // Objetos normales
+  // Objetos normales primero
   gl.useProgram(colorProgramInfo.program);
   twgl.setUniforms(colorProgramInfo, uniforms);
   gl.enable(gl.CULL_FACE);
@@ -728,6 +726,21 @@ async function drawScene() {
   for (let object of scene.objects) {
     if (object.isSkybox) continue;
     drawObject(gl, colorProgramInfo, object, viewProjectionMatrix, fract);
+  }
+
+  // Skybox al final (como fondo)
+  const skyboxObjects = scene.objects.filter(obj => obj.isSkybox);
+  if (skyboxObjects.length > 0) {
+    gl.useProgram(skyboxProgramInfo.program);
+    gl.disable(gl.CULL_FACE);
+    gl.depthFunc(gl.LEQUAL);
+    gl.depthMask(false); // Don't write to depth buffer
+    
+    for (let skybox of skyboxObjects) {
+      drawObject(gl, skyboxProgramInfo, skybox, viewProjectionMatrix, 1.0);
+    }
+    
+    gl.depthMask(true); // Re-enable depth writing
   }
 
   // Actualización lógica
@@ -741,9 +754,6 @@ async function drawScene() {
   requestAnimationFrame(drawScene);
 }
 
-// =======================================================
-// VIEW / PROJECTION
-// =======================================================
 function setupViewProjection(gl) {
   const fov = 60 * Math.PI / 180;
   const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
