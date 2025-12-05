@@ -1,15 +1,12 @@
 from trafficBase.agent import *
 from trafficBase.model import CityModel
-from mesa.visualization import (
-    CommandConsole,
-    Slider,
-    SolaraViz,
-    SpaceRenderer,
-)
+from mesa.visualization import CommandConsole, Slider, SolaraViz, SpaceRenderer, make_space_component, make_plot_component
 from mesa.visualization.components import AgentPortrayalStyle
+import matplotlib.pyplot as plt
 
-
+# Definición de la representación visual de los agentes (simulación)
 def random_portrayal(agent):
+    """Defines how each agent is portrayed visually."""
     if agent is None:
         return None
 
@@ -49,15 +46,48 @@ def random_portrayal(agent):
         portrayal.marker = "D"
         portrayal.zorder = 2
 
-    else:
-        # fallback for any other agent
-        portrayal.color = "black"
-        portrayal.size = 25
-        portrayal.marker = "o"
-        portrayal.zorder = 2
-
     return portrayal
 
+def plot_simulation(model):
+    """Generates the simulation grid."""
+    renderer = SpaceRenderer(
+        model,
+        backend="matplotlib",
+    )
+    renderer.draw_agents(random_portrayal)
+    plt.title("Simulation of the City Model")
+    plt.show()
+
+def plot_cars_in_simulation(model):
+    """Generates the 'Cars in Simulation' bar chart."""
+    model_data = model.datacollector.get_model_vars_dataframe()
+    
+    if "Cars_in_model" in model_data.columns:
+        cars_in_model = model_data["Cars_in_model"]
+        plt.figure()
+        plt.bar(range(len(cars_in_model)), cars_in_model, color='blue')
+        plt.xlabel("Steps")
+        plt.ylabel("Number of Cars")
+        plt.title("Number of Cars in Simulation")
+        plt.show()
+
+def plot_cars_arrived(model):
+    """Generates the 'Cars Arrived' bar chart."""
+    model_data = model.datacollector.get_model_vars_dataframe()
+    
+    if "Cars_arrived" in model_data.columns:
+        cars_arrived = model_data["Cars_arrived"]
+        
+        # Graficar el número de autos que han llegado en cada paso
+        plt.figure()
+        plt.bar(range(len(cars_arrived)), cars_arrived, color='green')
+        plt.xlabel("Steps")
+        plt.ylabel("Number of Cars Arrived")
+        plt.title("Number of Cars that Arrived at Destination")
+        plt.show()
+
+
+# Model parameters for simulation
 model_params = {
     "seed": {
         "type": "InputText",
@@ -67,23 +97,33 @@ model_params = {
     "N": Slider("Number of agents", 10, 1, 50),
 }
 
-
-# Create the model using the initial parameters from the settings
+# Create the CityModel
 model = CityModel(
     N=model_params["N"].value,
     seed=model_params["seed"]["value"]
 )
 
-renderer = SpaceRenderer(
-    model,
-    backend="matplotlib",
-)
-renderer.draw_agents(random_portrayal)
+# Show the simulation
+plot_simulation(model)
 
+# Generate the graph for cars in simulation
+plot_cars_in_simulation(model)
+
+# Generate the graph for cars that arrived
+plot_cars_arrived(model)
+
+# Create the Solara app to display the simulation
 page = SolaraViz(
     model,
-    renderer,
-    components=[CommandConsole],
+    components=[
+        make_space_component(
+            random_portrayal,
+            draw_grid=True,  # Allows visualizing the grid cells
+            post_process=lambda ax: ax.set_aspect("equal")
+        ),
+        make_plot_component({"Cars_in_model": "blue"}),
+        make_plot_component({"Cars_arrived": "green"})
+    ],
     model_params=model_params,
-    name="Random Model",
+    name="City Model Simulation",
 )
