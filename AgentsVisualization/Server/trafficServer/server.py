@@ -1,128 +1,64 @@
-"""
-Solara server for the traffic simulation model.
-Adaptado para mostrar:
- - Carros activos
- - Carros spawnados
- - Carros que llegan al destino
-"""
-
-from trafficBase.agent import *
-from trafficBase.model import CityModel
-
-from mesa.visualization import (
-    Slider,
-    CommandConsole,
-    SolaraViz,
-    make_space_component,
-    make_plot_component,
-)
-
+# visualization.py
+from mesa.visualization import Slider, SolaraViz, make_space_component, make_plot_component
 from mesa.visualization.components import AgentPortrayalStyle
-import solara
+from trafficBase.model import CityModel
+from trafficBase.agent import Car, Road, Traffic_Light, Destination, Obstacle
 
-
-# -------------------------------------------------------------------
-# PORTRAYAL
-# -------------------------------------------------------------------
-def agent_portrayal(agent):
-
+# Definición de la apariencia de los agentes
+def city_portrayal(agent):
     if agent is None:
-        return
-
-    portrayal = AgentPortrayalStyle(marker="o")
-
-    if isinstance(agent, Road):
-        portrayal.color = "white"
-        portrayal.marker = "s"
-
-    elif isinstance(agent, Traffic_Light):
-        portrayal.color = "green" if agent.is_green else "red"
-
-    elif isinstance(agent, Destination):
-        portrayal.color = "yellow"
-        portrayal.marker = "D"
-
+        return None
+    portrayal = AgentPortrayalStyle(size=50, marker="o")
+    
+    if isinstance(agent, Car):
+        portrayal.color = "blue"
     elif isinstance(agent, Obstacle):
         portrayal.color = "gray"
         portrayal.marker = "s"
-
-    elif isinstance(agent, Car):
-        portrayal.color = "blue"
+        portrayal.size = 100
+    elif isinstance(agent, Traffic_Light):
+        portrayal.color = "green" if agent.is_green else "red"
+        portrayal.marker = "o"
+        portrayal.size = 50
+    elif isinstance(agent, Road):
+        portrayal.color = "white"
+        portrayal.marker = "s"
+        portrayal.size = 50
+    elif isinstance(agent, Destination):
+        portrayal.color = "yellow"
+        portrayal.marker = "D"
+        portrayal.size = 50
 
     return portrayal
 
-
-# -------------------------------------------------------------------
-# PARAMETROS DEL MODELO
-# -------------------------------------------------------------------
-model_params = {
-    "N": Slider("Max Cars", 10, 1, 50),
-    "seed": {
-        "type": "InputText",
-        "value": 42,
-        "label": "Seed",
-    },
-}
-
-
-# Crear modelo
-model = CityModel(
-    N=model_params["N"].value,
-    seed=model_params["seed"]["value"],
-    spawn_rate=10,     # ← cada cuántos steps spawnean
-)
-
-
-
-# -------------------------------------------------------------------
-# AJUSTES VISUALES
-# -------------------------------------------------------------------
 def post_process(ax):
     ax.set_aspect("equal")
 
+# Parámetros del modelo
+model_params = {
+    "seed": {"type": "InputText", "value": 42, "label": "Random Seed"},
+    "N": Slider("Number of cars", 10, 1, 50),
+}
 
-# -------------------------------------------------------------------
-# TRES GRÁFICAS SEPARADAS
-# -------------------------------------------------------------------
+# Crear instancia del modelo
+NUM_STEPS = 300
+model = CityModel(N=model_params["N"].value, seed=model_params["seed"]["value"])
 
-# 1. Carros activos en el modelo
-cars_active_component = make_plot_component(
-    {"Cars_in_model": "tab:blue"}
-)
-
-# 2. Carros totales spawneados
-cars_spawned_component = make_plot_component(
-    {"Cars_spawned": "tab:orange"}
-)
-
-# 3. Carros que llegaron al destino
-cars_arrived_component = make_plot_component(
-    {"Cars_arrived": "tab:green"}
-)
-
-
-# -------------------------------------------------------------------
-# GRID VISUALIZATION
-# -------------------------------------------------------------------
+# Componentes de visualización
 space_component = make_space_component(
-    agent_portrayal,
+    city_portrayal,
     draw_grid=True,
-    post_process=post_process,
+    post_process=post_process
 )
 
+cars_plot = make_plot_component({"Cars_in_model": "blue"})
+arrived_plot = make_plot_component({"Cars_arrived": "green"})
+spawned_plot = make_plot_component({"Total_spawned": "orange"})
 
-# -------------------------------------------------------------------
-# SOLARA PAGE
-# -------------------------------------------------------------------
+# Página SolaraViz
 page = SolaraViz(
     model,
-    components=[
-        CommandConsole,
-        space_component,
-        cars_active_component,
-        cars_spawned_component,
-        cars_arrived_component
-    ],
+    components=[space_component, cars_plot, arrived_plot, spawned_plot],
     model_params=model_params,
-    name="City Traffic Simulation",
+    name="City Traffic Simulation"
 )

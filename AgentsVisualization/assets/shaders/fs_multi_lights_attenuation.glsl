@@ -28,7 +28,7 @@ void main() {
     // Use texture if available
     vec4 texColor = texture(u_texture, v_texCoord);
     if(texColor.a > 0.01) {
-        base = texColor;
+        base = texColor * u_color;
     }
 
     vec3 N = normalize(v_normal);

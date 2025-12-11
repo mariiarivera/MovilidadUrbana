@@ -2,6 +2,7 @@
 
 from mesa import Model
 from mesa.discrete_space import OrthogonalMooreGrid
+from mesa.datacollection import DataCollector
 import json
 import random
 from mesa.datacollection import DataCollector
@@ -13,7 +14,6 @@ class CityModel(Model):
     
     def __init__(self, N, seed=42, spawn_rate=1):
         super().__init__(seed=seed)
-
         self.random_gen = random.Random(seed)
         self.num_agents = N
         self.spawn_rate = spawn_rate            # ← cada cuántos steps salen carros
@@ -25,60 +25,60 @@ class CityModel(Model):
         self.total_arrived = 0
 
         dataDictionary = json.load(open("city_files/mapDictionary.json"))
-
+        
         with open("city_files/2025_base.txt") as baseFile:
             lines = baseFile.readlines()
-            self.width = len(lines[0].strip())
-            self.height = len(lines)
-            
-            self.grid = OrthogonalMooreGrid(
-                [self.width, self.height],
-                capacity=100,
-                torus=False,
-                random=self.random_gen
-            )
-
-            # Parse map
-            for r, row in enumerate(lines):
-                row_str = row.strip()
-                for c, col in enumerate(row_str):
-                    pos = (c, self.height - r - 1)
-                    cell = self.grid[pos]
-
-                    if col in [">", "<", "v", "^"]:
-                        direction = dataDictionary[col]
-                        road = Road(self, cell, direction)
-                        cell.agents.append(road)
-
-                    elif col in ["S", "s"]:
+        
+        self.width = len(lines[0].strip())
+        self.height = len(lines)
+        
+        self.grid = OrthogonalMooreGrid(
+            [self.width, self.height],
+            capacity=100,
+            torus=False,
+            random=self.random_gen
+        )
+        
+      
+        for r, row in enumerate(lines):
+            row_str = row.strip()
+            for c, col in enumerate(row_str):
+                pos = (c, self.height - r - 1)
+                cell = self.grid[pos]
+                
+                if col in [">", "<", "v", "^"]:
+                    direction = dataDictionary[col]
+                    road = Road(self, cell, direction)
+                    cell.agents.append(road)
+                
+                elif col in ["S", "s"]:
+                    direction = "Right"
+                    if c > 0 and row_str[c-1] in ['>', 's', 'S']:
                         direction = "Right"
-                        if c > 0 and row_str[c-1] in ['>', 's', 'S']:
-                            direction = "Right"
-                        elif c < len(row_str) - 1 and row_str[c+1] in ['>', 's', 'S']:
-                            direction = "Right"
-                        elif r > 0 and c < len(lines[r-1].strip()) and lines[r-1].strip()[c] == 'v':
-                            direction = "Down"
-                        elif r < len(lines) - 1 and c < len(lines[r+1].strip()) and lines[r+1].strip()[c] == '^':
-                            direction = "Up"
-                        
-                        road = Road(self, cell, direction)
-                        cell.agents.append(road)
-                        
-                        state = False if col == "S" else True
-                        timeToChange = dataDictionary[col]
-                        tl = Traffic_Light(self, cell, state, timeToChange)
-                        cell.agents.append(tl)
-                        self.traffic_lights.append(tl)
-
-                    elif col == "#":
-                        obs = Obstacle(self, cell)
-                        cell.agents.append(obs)
-
-                    elif col == "D":
-                        dest = Destination(self, cell)
-                        cell.agents.append(dest)
-                        self.destinations.append(dest)
-
+                    elif c < len(row_str) - 1 and row_str[c+1] in ['>', 's', 'S']:
+                        direction = "Right"
+                    elif r > 0 and c < len(lines[r-1].strip()) and lines[r-1].strip()[c] == 'v':
+                        direction = "Down"
+                    elif r < len(lines) - 1 and c < len(lines[r+1].strip()) and lines[r+1].strip()[c] == '^':
+                        direction = "Up"
+                    
+                    road = Road(self, cell, direction)
+                    cell.agents.append(road)
+                    
+                    state = False if col == "S" else True
+                    timeToChange = dataDictionary[col]
+                    tl = Traffic_Light(self, cell, state, timeToChange)
+                    cell.agents.append(tl)
+                    self.traffic_lights.append(tl)
+                
+                elif col == "#":
+                    obs = Obstacle(self, cell)
+                    cell.agents.append(obs)
+                
+                elif col == "D":
+                    dest = Destination(self, cell)
+                    cell.agents.append(dest)
+                    self.destinations.append(dest)
         
         self.corners = [
             (0, 0),
@@ -139,9 +139,7 @@ class CityModel(Model):
                     break
 
 
-    # -------------------------------------------------------
-    # STEP
-    # -------------------------------------------------------
+ 
     def step(self):
 
         # Control de spawn según spawn_rate
