@@ -1,32 +1,29 @@
+# Model.py 
+
 from mesa import Model
 from mesa.discrete_space import OrthogonalMooreGrid
 from mesa.datacollection import DataCollector
 import json
 import random
+from mesa.datacollection import DataCollector
 from .agent import Road, Traffic_Light, Destination, Obstacle, Car
+
 
 class CityModel(Model):
     """Creates a model based on a city map."""
     
-    def __init__(self, N, seed=42):
+    def __init__(self, N, seed=42, spawn_rate=1):
         super().__init__(seed=seed)
         self.random_gen = random.Random(seed)
         self.num_agents = N
+        self.spawn_rate = spawn_rate            # ← cada cuántos steps salen carros
+        self.spawn_counter = 0                  # ← contador interno
         self.traffic_lights = []
         self.destinations = []
         self.car_counter = 0
-        self.total_spawned = 0  
-        self.total_arrived = 0  
-        
-       
-        self.datacollector = DataCollector(
-            model_reporters={
-                "Cars_in_model": lambda m: sum(1 for a in m.agents if isinstance(a, Car)),
-                "Cars_arrived": lambda m: m.total_arrived,
-                "Total_spawned": lambda m: m.total_spawned
-            }
-        )
-        
+        self.total_spawned = 0
+        self.total_arrived = 0
+
         dataDictionary = json.load(open("city_files/mapDictionary.json"))
         
         with open("city_files/2025_base.txt") as baseFile:
@@ -89,16 +86,33 @@ class CityModel(Model):
             (0, self.height - 1),
             (self.width - 1, self.height - 1)
         ]
-        
+
+        # Spawn inicial
         self.spawnCars()
+
+        # ---------------------------------------------------
+        #       DATA COLLECTOR
+        # ---------------------------------------------------
+        self.datacollector = DataCollector(
+            model_reporters={
+                "Cars_in_model": lambda m: len([a for a in m.agents if isinstance(a, Car)]),
+                "Cars_spawned": lambda m: m.total_spawned,
+                "Cars_arrived": lambda m: m.total_arrived,
+            }
+        )
+
+        self.datacollector.collect(self)
         self.running = True
-    
+
+
+    # -------------------------------------------------------
+    # SPAWN
+    # -------------------------------------------------------
     def spawnCars(self):
-        """Spawn cars at corners with reachable destinations."""
+        """Spawn cars at corners."""
         if not self.destinations:
             return
         
-        spawned = 0
         available_corners = self.corners.copy()
         self.random_gen.shuffle(available_corners)
         
@@ -121,18 +135,25 @@ class CityModel(Model):
                 if car.path:
                     cell.agents.append(car)
                     self.agents.add(car)
-                    spawned += 1
                     self.total_spawned += 1
                     break
-    
+
+
+ 
     def step(self):
-        """Advance model by one step."""
-        self.spawnCars()
+
+        # Control de spawn según spawn_rate
+        if self.spawn_counter % self.spawn_rate == 0:
+            self.spawnCars()
+
+        self.spawn_counter += 1
+
+        # Avanzar agentes
         self.agents.shuffle_do("step")
-        
-        # Remove cars that have arrived
+
+        # Eliminar agentes que llegaron
         cars_to_remove = [
-            agent for agent in list(self.agents) 
+            agent for agent in list(self.agents)
             if isinstance(agent, Car) and hasattr(agent, '_should_remove')
         ]
         
@@ -140,6 +161,6 @@ class CityModel(Model):
             if car.cell and car in car.cell.agents:
                 car.cell.agents.remove(car)
             self.agents.remove(car)
-            self.total_arrived += 1  
-        
+
+        # Registrar datos
         self.datacollector.collect(self)
