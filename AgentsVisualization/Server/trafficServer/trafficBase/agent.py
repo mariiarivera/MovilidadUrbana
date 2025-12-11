@@ -1,11 +1,10 @@
-#Agent.py
+# Agent.py
 
 from mesa.discrete_space import CellAgent, FixedAgent
 import heapq
 
 
 class Road(FixedAgent):
-    """Road cell with allowed movement direction."""
     def __init__(self, model, cell, direction="Left"):
         super().__init__(model)
         self.cell = cell
@@ -13,7 +12,6 @@ class Road(FixedAgent):
 
 
 class Traffic_Light(FixedAgent):
-    """Traffic light."""
     def __init__(self, model, cell, state=False, timeToChange=10):
         super().__init__(model)
         self.cell = cell
@@ -30,36 +28,30 @@ class Traffic_Light(FixedAgent):
 
 
 class Destination(FixedAgent):
-    """Destination agent."""
     def __init__(self, model, cell):
         super().__init__(model)
         self.cell = cell
 
 
 class Obstacle(FixedAgent):
-    """Obstacle agent."""
     def __init__(self, model, cell):
         super().__init__(model)
         self.cell = cell
 
 
 class Car(CellAgent):
-    """Car agent using A* pathfinding adapted from your original code."""
-    
     def __init__(self, model, cell, unique_id=None, dest=None):
         super().__init__(model)
         self.cell = cell
         self.unique_id = unique_id
-        self.dest = dest  # This is the Destination agent
+        self.dest = dest
         self.path = []
         self.compute_path()
 
     def heuristic(self, a, b):
-        """Manhattan distance."""
         return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
     def get_neighbors(self, pos):
-        """Get neighbors using MOORE neighborhood and filter by road direction."""
         x, y = pos
         neighbors = []
         
@@ -103,14 +95,12 @@ class Car(CellAgent):
         return neighbors
 
     def is_path_clear(self, current, neighbor):
-        """Check if path from current to neighbor is clear."""
         neighbor_cell = self.model.grid[neighbor]
         
         for agent in neighbor_cell.agents:
             if isinstance(agent, Obstacle):
                 return False
         
-        # FIX: Check if destination cell matches goal
         goal_coord = self.dest.cell.coordinate
         for agent in neighbor_cell.agents:
             if isinstance(agent, Destination) and neighbor != goal_coord:
@@ -119,9 +109,8 @@ class Car(CellAgent):
         return True
 
     def compute_path(self):
-        """A* search adapted from your original a_star_search."""
         start = self.cell.coordinate
-        goal = self.dest.cell.coordinate  # FIX: Access coordinate correctly
+        goal = self.dest.cell.coordinate
         
         open_set = []
         heapq.heappush(open_set, (0, start))
@@ -160,36 +149,50 @@ class Car(CellAgent):
         
         self.path = []
 
-    def step(self):
-        """Move one step along path."""
-        if hasattr(self, '_should_remove'):
-            return
-            
-        # FIX: Check destination correctly
-        if self.cell.coordinate == self.dest.cell.coordinate:
-            if self in self.cell.agents:
+        def step(self):
+            """ Arquitectura de Subsunción del agente Car: Las capas se evalúan de mayor a menor prioridad. La primera que se active bloquea las inferiores"""
+
+            # CAPA 0 — Meta alcanzada (máxima prioridad)
+            if self.cell.coordinate == self.dest.cell.coordinate:
+                self.model.total_arrived += 1
                 self.cell.agents.remove(self)
-            self._should_remove = True
-            return
+                self._should_remove = True
+                return  # ninguna otra capa se evalúa
+
+
+          
+            # CAPA 1 — Validación/Replanificación de Ruta (A*)
+            if not self.path:       # ruta vacía o no válida
+                self.compute_path()
+
+                if not self.path:   # imposible planear ruta
+                    return          # bloquea movimiento, permite reintento en futuros steps
+
+
+            # Obtener siguiente celda (todas las capas inferiores la usan)
+            next_pos = self.path[0]
+            next_cell = self.model.grid[next_pos]
+
+
+            # CAPA 2 — Semáforos (control obligatorio)
+            tl = next((a for a in next_cell.agents if isinstance(a, Traffic_Light)), None)
+            if tl and not tl.is_green:
+                return  # el semáforo bloquea todas las capas inferiores
+
+
         
-        if not self.path:
-            return
-        
-        next_pos = self.path[0]
-        next_cell = self.model.grid[next_pos]
-        
-        # Check traffic light
-        for agent in next_cell.agents:
-            if isinstance(agent, Traffic_Light) and not agent.is_green:
-                return
-        
-        # Check other cars
-        if any(isinstance(a, Car) for a in next_cell.agents):
-            return
-        
-        # Move
-        if self in self.cell.agents:
+            # CAPA 3 — Prevención de colisiones
+
+            if any(isinstance(a, Car) for a in next_cell.agents):
+                return  # otro carro bloquea el movimiento, ruta no cambia
+
+
+            # CAPA 4 — Movimiento básico (menor prioridad)
+            # Mover al agente a la siguiente celda
             self.cell.agents.remove(self)
-        next_cell.agents.append(self)
-        self.cell = next_cell
-        self.path.pop(0)
+            next_cell.agents.append(self)
+            self.cell = next_cell
+
+            # Avanzar en la ruta
+            self.path.pop(0)
+
